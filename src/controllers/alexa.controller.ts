@@ -1,5 +1,32 @@
 import { Request, Response } from 'express';
 import { buildAlexaResponse, buildAlexaEmptyResponse } from '../utils/alexa-response';
+import { aiService } from '../ai/ai.service';
+
+/**
+ * Helper to extract user input from slots in an Alexa IntentRequest.
+ * It searches through all slots and returns the value of the first populated slot.
+ *
+ * @param alexaRequest The incoming Alexa request body
+ * @returns The user prompt text if found, or null otherwise
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractUserPrompt(alexaRequest: any): string | null {
+  const slots = alexaRequest.request?.intent?.slots;
+  if (!slots) {
+    return null;
+  }
+
+  for (const slotKey in slots) {
+    if (Object.prototype.hasOwnProperty.call(slots, slotKey)) {
+      const slot = slots[slotKey];
+      if (slot && typeof slot.value === 'string' && slot.value.trim().length > 0) {
+        return slot.value.trim();
+      }
+    }
+  }
+
+  return null;
+}
 
 export class AlexaController {
   /**
@@ -35,7 +62,7 @@ export class AlexaController {
       switch (requestType) {
         case 'LaunchRequest': {
           const response = buildAlexaResponse(
-            'Welcome to Durjoy AI. How can I help you today?',
+            "Yo! I'm Durjoy AI. What's up? What can I help you with today?",
             false,
           );
           res.status(200).json(response);
@@ -47,11 +74,39 @@ export class AlexaController {
           // eslint-disable-next-line no-console
           console.log(`[Alexa Request] Intent Name: ${intentName}`);
 
-          const response = buildAlexaResponse(
-            'I heard your request. AI integration is coming soon.',
-            false,
-          );
-          res.status(200).json(response);
+          const userPrompt = extractUserPrompt(alexaRequest);
+          if (!userPrompt) {
+            // eslint-disable-next-line no-console
+            console.log('[Alexa Request] Empty or missing user prompt.');
+            const response = buildAlexaResponse('Yo, say that again, man.', false);
+            res.status(200).json(response);
+            break;
+          }
+
+          // eslint-disable-next-line no-console
+          console.log(`[Alexa Request] Extracted prompt: "${userPrompt}"`);
+
+          try {
+            const aiResponse = await aiService.generateResponse(userPrompt);
+
+            if (!aiResponse || aiResponse.trim().length === 0) {
+              // eslint-disable-next-line no-console
+              console.warn('[Alexa Request] AI service returned an empty response.');
+              const response = buildAlexaResponse('Yo, say that again, man.', false);
+              res.status(200).json(response);
+            } else {
+              const response = buildAlexaResponse(aiResponse, false);
+              res.status(200).json(response);
+            }
+          } catch (aiError) {
+            // eslint-disable-next-line no-console
+            console.error('[Alexa Request] Error invoking AI service:', aiError);
+            const response = buildAlexaResponse(
+              'Yo, something went wrong. Give me another shot in a moment.',
+              false,
+            );
+            res.status(200).json(response);
+          }
           break;
         }
 
