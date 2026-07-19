@@ -2,6 +2,7 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import healthRoutes from './routes/health.routes';
+import alexaRoutes from './routes/alexa.routes';
 
 const app: Application = express();
 
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use(healthRoutes);
+app.use(alexaRoutes);
 
 // Catch-all route for unmatched paths (404)
 app.use((_req: Request, res: Response) => {
