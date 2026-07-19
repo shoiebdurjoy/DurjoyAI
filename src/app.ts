@@ -4,12 +4,22 @@ import helmet from 'helmet';
 import http from 'http';
 import healthRoutes from './routes/health.routes';
 import alexaRoutes from './routes/alexa.routes';
+import { requestLogger } from './middleware/logger.middleware';
 
 const app: Application = express();
 
 // Global Middleware
 app.use(helmet());
-app.use(cors());
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*';
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+  }),
+);
+app.use(requestLogger);
 app.use(
   express.json({
     verify: (req: http.IncomingMessage & { rawBody?: Buffer }, _res, buf) => {
