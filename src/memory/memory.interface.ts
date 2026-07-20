@@ -1,12 +1,40 @@
+export type MemoryCategory =
+  | 'Personal'
+  | 'Preference'
+  | 'Education'
+  | 'Career'
+  | 'Device'
+  | 'Project'
+  | 'Family'
+  | 'Relationship'
+  | 'Health'
+  | 'Location'
+  | 'Skill'
+  | 'Goal'
+  | 'Custom';
+
 export interface MemoryRecord {
   id: string;
-  category: string;
+  category: MemoryCategory | string;
   key: string;
   value: string;
-  importance: number;
-  confidence: number;
+  importance: number; // 1-10 scale
+  confidence: number; // 0-100 scale
+  accessCount: number;
+  lastAccessed: Date;
+  parentId?: string | null;
+  relatedIds?: string[];
+  selectionReason?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MemoryHistoryRecord {
+  id: string;
+  memoryId: string;
+  oldValue: string;
+  newValue: string;
+  changedAt: Date;
 }
 
 export interface IPersistentMemoryRepository {
@@ -27,13 +55,18 @@ export interface IPersistentMemoryRepository {
 
   /**
    * Saves or updates a memory record.
-   * If a record with matching key & category exists, updates it instead of duplicating.
-   * Increments confidence if the value matches the existing record.
+   * Handles conflict resolution by archiving old values into history.
+   * Increments confidence and access count when identical facts are confirmed.
    */
   saveMemory(
-    memory: Omit<MemoryRecord, 'id' | 'createdAt' | 'updatedAt' | 'confidence'> & {
+    memory: Omit<
+      MemoryRecord,
+      'id' | 'createdAt' | 'updatedAt' | 'lastAccessed' | 'accessCount' | 'confidence'
+    > & {
       id?: string;
       confidence?: number;
+      accessCount?: number;
+      lastAccessed?: Date;
     },
   ): Promise<MemoryRecord>;
 
@@ -46,6 +79,21 @@ export interface IPersistentMemoryRepository {
    * Keyword-based search across category, key, and value fields.
    */
   searchMemories(query: string): Promise<MemoryRecord[]>;
+
+  /**
+   * Updates lastAccessed and increments accessCount for a memory record.
+   */
+  touchMemory(id: string): Promise<void>;
+
+  /**
+   * Retrieves archived change history for a memory record.
+   */
+  getMemoryHistory(memoryId: string): Promise<MemoryHistoryRecord[]>;
+
+  /**
+   * Safely cleans up low-confidence and obsolete memories.
+   */
+  cleanupMemories(minConfidence?: number): Promise<number>;
 }
 
 export interface UserProfile {

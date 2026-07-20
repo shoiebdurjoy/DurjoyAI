@@ -48,10 +48,10 @@ describe('Natural Conversation & Automatic Memory Learning Tests', () => {
 
   it('should increase memory confidence when identical facts are confirmed or repeated', async () => {
     const first = await memoryService.saveMemory('Device', 'GPU', 'RTX 5070', 4);
-    assert.strictEqual(first.confidence, 1.0);
+    assert.strictEqual(first.confidence, 50);
 
     const second = await memoryService.saveMemory('Device', 'GPU', 'RTX 5070', 4);
-    assert.strictEqual(second.confidence, 2.0);
+    assert.strictEqual(second.confidence, 60);
   });
 
   it('should maintain short-term session conversation history for multi-turn dialogue', async () => {

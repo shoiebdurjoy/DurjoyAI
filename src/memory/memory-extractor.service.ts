@@ -1,12 +1,14 @@
 import { persistentMemoryService, PersistentMemoryService } from './persistent-memory.service';
-import { MemoryRecord } from './memory.interface';
+import { MemoryRecord, MemoryCategory } from './memory.interface';
 
 export interface ExtractedFact {
   shouldRemember: boolean;
-  category?: string;
+  category?: MemoryCategory | string;
   key?: string;
   value?: string;
   importance?: number;
+  parentId?: string;
+  relatedIds?: string[];
 }
 
 export class MemoryExtractorService {
@@ -35,7 +37,9 @@ export class MemoryExtractorService {
       extracted.category,
       extracted.key,
       extracted.value,
-      extracted.importance ?? 3,
+      extracted.importance ?? 5,
+      extracted.parentId,
+      extracted.relatedIds,
     );
   }
 
@@ -58,7 +62,7 @@ export class MemoryExtractorService {
 
     const text = prompt.trim();
 
-    // 1. Favorite Club / Sport Team
+    // 1. Favorite Club / Sport Team (Preference)
     const favClubMatch =
       text.match(/my favorite (football |soccer |sports )?club is (.+)/i) ||
       text.match(/my favorite team is (.+)/i);
@@ -68,11 +72,11 @@ export class MemoryExtractorService {
         category: 'Preference',
         key: 'Favorite Football Club',
         value: favClubMatch[2].replace(/[.!]$/, '').trim(),
-        importance: 4,
+        importance: 8,
       };
     }
 
-    // 2. Education & Major
+    // 2. Education & Major (Education)
     const eduMatch = text.match(/i study (.+?) at (.+)/i) || text.match(/i am a student at (.+)/i);
     if (eduMatch) {
       return {
@@ -80,11 +84,11 @@ export class MemoryExtractorService {
         category: 'Education',
         key: 'University',
         value: eduMatch[2].replace(/[.!]$/, '').trim(),
-        importance: 5,
+        importance: 9,
       };
     }
 
-    // 3. Hardware / Device / GPU
+    // 3. Hardware / Device / GPU (Device)
     const gpuMatch =
       text.match(/i bought a new (RTX \d+|GTX \d+|GPU|graphics card:? (.+))/i) ||
       text.match(/my (desktop|pc|computer|gpu) (has|is) (an? )?(.+)/i);
@@ -95,11 +99,11 @@ export class MemoryExtractorService {
         category: 'Device',
         key: 'GPU',
         value: val.replace(/[.!]$/, '').trim(),
-        importance: 4,
+        importance: 7,
       };
     }
 
-    // 4. Laptop
+    // 4. Laptop (Device)
     const laptopMatch =
       text.match(/i (bought|have|use) a new laptop:? (.+)/i) ||
       text.match(/my laptop is (an? )?(.+)/i);
@@ -109,11 +113,11 @@ export class MemoryExtractorService {
         category: 'Device',
         key: 'Laptop',
         value: laptopMatch[2].replace(/[.!]$/, '').trim(),
-        importance: 4,
+        importance: 8,
       };
     }
 
-    // 5. Work / Career
+    // 5. Work / Career (Career)
     const workMatch = text.match(/i work as (an? )?(.+)/i) || text.match(/my job is (an? )?(.+)/i);
     if (workMatch) {
       return {
@@ -121,11 +125,11 @@ export class MemoryExtractorService {
         category: 'Career',
         key: 'Occupation',
         value: workMatch[2].replace(/[.!]$/, '').trim(),
-        importance: 4,
+        importance: 9,
       };
     }
 
-    // 6. Generic Favorite
+    // 6. Generic Favorite (Preference)
     const genFavMatch = text.match(/my favorite ([a-z\s]+) is (.+)/i);
     if (genFavMatch) {
       const key = genFavMatch[1].trim().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -134,11 +138,11 @@ export class MemoryExtractorService {
         category: 'Preference',
         key: `Favorite ${key}`,
         value: genFavMatch[2].replace(/[.!]$/, '').trim(),
-        importance: 3,
+        importance: 6,
       };
     }
 
-    // 7. Name
+    // 7. Name (Personal)
     const nameMatch = text.match(/my name is (.+)/i);
     if (nameMatch) {
       return {
@@ -146,7 +150,7 @@ export class MemoryExtractorService {
         category: 'Personal',
         key: 'Name',
         value: nameMatch[1].replace(/[.!]$/, '').trim(),
-        importance: 5,
+        importance: 10,
       };
     }
 
