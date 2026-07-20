@@ -6,10 +6,12 @@ import {
 } from '../memory/persistent-memory.service';
 import { sessionService, SessionService } from '../memory/session.service';
 import { memoryExtractorService, MemoryExtractorService } from '../memory/memory-extractor.service';
+import { toolManager, ToolManager } from '../tools/tool.manager';
 
 export interface AIServiceOptions {
   userId?: string;
   sessionId?: string;
+  confirmed?: boolean;
 }
 
 export class AIService {
@@ -18,15 +20,16 @@ export class AIService {
     private readonly memory: PersistentMemoryService = persistentMemoryService,
     private readonly session: SessionService = sessionService,
     private readonly extractor: MemoryExtractorService = memoryExtractorService,
+    private readonly tools: ToolManager = toolManager,
   ) {}
 
   /**
-   * Generates an AI response by automatically extracting memories, assembling dialogue history,
-   * building a unified system prompt, and delegating to the active LLM provider.
+   * Generates an AI response by automatically checking tool execution requests,
+   * extracting memories, building dialogue history, and delegating to the active provider.
    *
    * @param prompt The input user prompt.
-   * @param options Optional userId and sessionId parameters or userId string.
-   * @returns A promise resolving to the provider's text response.
+   * @param options Optional userId, sessionId, or confirmed flags.
+   * @returns A promise resolving to the text response.
    */
   public async generateResponse(
     prompt: string,
@@ -35,17 +38,32 @@ export class AIService {
     const userId = typeof options === 'string' ? options : options?.userId || 'default-user';
     const sessionId =
       typeof options === 'object' ? options?.sessionId || 'default-session' : 'default-session';
+    const confirmed = typeof options === 'object' ? options?.confirmed || false : false;
 
-    // 1. Automatic Memory Learning: Extract and save any long-term personal facts
+    // 1. Tool Intent Detection & Execution
+    const toolCall = this.tools.determineToolSelection(prompt);
+    if (toolCall) {
+      const toolResult = await this.tools.executeAndFormatResult(toolCall.toolId, toolCall.args, {
+        confirmed,
+      });
+
+      // Track in short-term session history
+      await this.session.appendMessage(userId, sessionId, 'user', prompt);
+      await this.session.appendMessage(userId, sessionId, 'assistant', toolResult.text);
+
+      return toolResult.text;
+    }
+
+    // 2. Automatic Memory Learning: Extract and save any long-term personal facts
     await this.extractor.analyzeAndSave(prompt);
 
-    // 2. Retrieve recent short-term conversation context before adding current turn
+    // 3. Retrieve recent short-term conversation context
     const conversationContext = await this.session.getRecentHistorySummary(userId, sessionId);
 
-    // 3. Append current user message to session history
+    // 4. Append current user message to session history
     await this.session.appendMessage(userId, sessionId, 'user', prompt);
 
-    // 4. Retrieve relevant long-term memories specifically matching prompt keywords
+    // 5. Retrieve relevant long-term memories
     const relevantMemories = await this.memory.getRelevantMemories(prompt);
 
     let contextSummary = '';
@@ -55,18 +73,18 @@ export class AIService {
         .join('\n');
     }
 
-    // 5. Build clean, unified system prompt via PersonalityService
+    // 6. Build clean, unified system prompt via PersonalityService
     const systemPrompt = await this.personality.getSystemPrompt({
       userId,
       contextSummary,
       conversationContext,
     });
 
-    // 6. Delegate completion to the active LLM provider
+    // 7. Delegate completion to active LLM provider
     const provider = AIFactory.getProvider();
     const responseText = await provider.generateResponse(prompt, systemPrompt);
 
-    // 7. Append assistant response to short-term session history
+    // 8. Append assistant response to short-term session history
     await this.session.appendMessage(userId, sessionId, 'assistant', responseText);
 
     return responseText;
