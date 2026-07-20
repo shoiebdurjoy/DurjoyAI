@@ -27,15 +27,28 @@ export class OpenRouterProvider implements AIProvider {
    * Handles API errors, network failures, timeouts, and empty responses.
    *
    * @param prompt The input text prompt.
+   * @param systemPrompt Optional system prompt containing personality and behavior instructions.
    * @returns A promise resolving to the generated response.
    */
-  public async generateResponse(prompt: string): Promise<string> {
+  public async generateResponse(prompt: string, systemPrompt?: string): Promise<string> {
     if (!this.apiKey) {
       throw new Error('OPENROUTER_API_KEY is not defined in the environment variables.');
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    const messages = [];
+    if (systemPrompt && systemPrompt.trim().length > 0) {
+      messages.push({
+        role: 'system',
+        content: systemPrompt.trim(),
+      });
+    }
+    messages.push({
+      role: 'user',
+      content: prompt,
+    });
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -49,12 +62,7 @@ export class OpenRouterProvider implements AIProvider {
         body: JSON.stringify({
           model: this.model,
           max_tokens: this.maxTokens,
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
+          messages,
         }),
         signal: controller.signal,
       });
