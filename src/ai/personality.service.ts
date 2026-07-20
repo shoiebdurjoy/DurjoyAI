@@ -4,11 +4,13 @@ import { DEFAULT_PERSONALITY_CONFIG } from './personality.constants';
 export interface SystemPromptOptions {
   userId?: string;
   contextSummary?: string;
+  conversationContext?: string;
 }
 
 export class PersonalityService {
   /**
    * Generates a consistent, provider-independent system prompt for AI requests.
+   * Assembles Personality + Brain 0 + Relevant Long-Term Memories + Short-Term Dialogue History.
    *
    * @param options System prompt context options
    * @returns Formatted system prompt text string
@@ -27,6 +29,10 @@ export class PersonalityService {
 
     if (options?.contextSummary) {
       prompt += `\n\nRELEVANT MEMORY CONTEXT:\n${options.contextSummary}`;
+    }
+
+    if (options?.conversationContext) {
+      prompt += `\n\nRECENT CONVERSATION HISTORY:\n${options.conversationContext}`;
     }
 
     return prompt.trim();

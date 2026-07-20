@@ -4,6 +4,7 @@ export interface MemoryRecord {
   key: string;
   value: string;
   importance: number;
+  confidence: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,9 +28,13 @@ export interface IPersistentMemoryRepository {
   /**
    * Saves or updates a memory record.
    * If a record with matching key & category exists, updates it instead of duplicating.
+   * Increments confidence if the value matches the existing record.
    */
   saveMemory(
-    memory: Omit<MemoryRecord, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+    memory: Omit<MemoryRecord, 'id' | 'createdAt' | 'updatedAt' | 'confidence'> & {
+      id?: string;
+      confidence?: number;
+    },
   ): Promise<MemoryRecord>;
 
   /**

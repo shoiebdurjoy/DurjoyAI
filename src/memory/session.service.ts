@@ -75,6 +75,30 @@ export class SessionService {
     await this.repo.saveConversationSession(userId, session);
     return session;
   }
+
+  /**
+   * Generates a text summary of the most recent conversation dialogue turns for prompt injection.
+   *
+   * @param userId Unique user identifier
+   * @param sessionId Active session identifier
+   * @param limit Maximum number of recent turns to include (default 6)
+   * @returns Formatted conversation summary string
+   */
+  public async getRecentHistorySummary(
+    userId: string,
+    sessionId: string,
+    limit = 6,
+  ): Promise<string> {
+    const session = await this.getOrCreateSession(userId, sessionId);
+    if (!session.messages || session.messages.length === 0) {
+      return '';
+    }
+
+    const recent = session.messages.slice(-limit);
+    return recent
+      .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+      .join('\n');
+  }
 }
 
 export const sessionService = new SessionService();

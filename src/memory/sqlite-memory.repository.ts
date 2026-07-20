@@ -24,7 +24,7 @@ export class SQLiteMemoryRepository implements IPersistentMemoryRepository {
   }
 
   /**
-   * Synchronously creates tables if they do not exist.
+   * Synchronously creates tables if they do not exist and handles schema alterations.
    */
   private initializeSync(): void {
     this.db.exec(`
@@ -34,11 +34,21 @@ export class SQLiteMemoryRepository implements IPersistentMemoryRepository {
         key TEXT NOT NULL,
         value TEXT NOT NULL,
         importance INTEGER NOT NULL DEFAULT 3,
+        confidence REAL NOT NULL DEFAULT 1.0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         UNIQUE(category, key)
       );
     `);
+
+    // Ensure confidence column exists if upgrading from an earlier schema version
+    try {
+      this.db.exec(
+        'ALTER TABLE persistent_memories ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0;',
+      );
+    } catch {
+      // Column already exists
+    }
   }
 
   public async initialize(): Promise<void> {
@@ -69,27 +79,47 @@ export class SQLiteMemoryRepository implements IPersistentMemoryRepository {
   }
 
   public async saveMemory(
-    memory: Omit<MemoryRecord, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+    memory: Omit<MemoryRecord, 'id' | 'createdAt' | 'updatedAt'> & {
+      id?: string;
+      confidence?: number;
+    },
   ): Promise<MemoryRecord> {
     const existing = await this.getMemoryByKey(memory.key, memory.category);
     const now = new Date().toISOString();
 
     if (existing) {
+      const sameValue = existing.value.trim().toLowerCase() === memory.value.trim().toLowerCase();
+      // Increase confidence if the user confirms or repeats identical facts
+      const newConfidence = sameValue
+        ? Math.min(10.0, Number((existing.confidence + 1.0).toFixed(1)))
+        : (memory.confidence ?? 1.0);
+
       const stmt = this.db.prepare(`
         UPDATE persistent_memories
-        SET value = ?, importance = ?, updated_at = ?
+        SET value = ?, importance = ?, confidence = ?, updated_at = ?
         WHERE id = ?
       `);
-      stmt.run(memory.value, memory.importance ?? 3, now, existing.id);
+      stmt.run(memory.value, memory.importance ?? 3, newConfidence, now, existing.id);
       const updated = await this.getMemoryByKey(memory.key, memory.category);
       return updated!;
     } else {
       const id = memory.id || `mem_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const initialConfidence = memory.confidence ?? 1.0;
+
       const stmt = this.db.prepare(`
-        INSERT INTO persistent_memories (id, category, key, value, importance, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO persistent_memories (id, category, key, value, importance, confidence, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      stmt.run(id, memory.category, memory.key, memory.value, memory.importance ?? 3, now, now);
+      stmt.run(
+        id,
+        memory.category,
+        memory.key,
+        memory.value,
+        memory.importance ?? 3,
+        initialConfidence,
+        now,
+        now,
+      );
       const created = await this.getMemoryByKey(memory.key, memory.category);
       return created!;
     }
@@ -106,7 +136,7 @@ export class SQLiteMemoryRepository implements IPersistentMemoryRepository {
     const stmt = this.db.prepare(`
       SELECT * FROM persistent_memories
       WHERE LOWER(key) LIKE ? OR LOWER(value) LIKE ? OR LOWER(category) LIKE ?
-      ORDER BY importance DESC, updated_at DESC
+      ORDER BY importance DESC, confidence DESC, updated_at DESC
     `);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = stmt.all(searchTerm, searchTerm, searchTerm) as any[];
@@ -120,7 +150,8 @@ export class SQLiteMemoryRepository implements IPersistentMemoryRepository {
       category: row.category,
       key: row.key,
       value: row.value,
-      importance: row.importance,
+      importance: row.importance ?? 3,
+      confidence: row.confidence ?? 1.0,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
