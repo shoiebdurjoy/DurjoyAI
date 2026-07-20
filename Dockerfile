@@ -1,6 +1,8 @@
 # Stage 1: Build the application
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /usr/src/app
 
 COPY package*.json ./
@@ -13,6 +15,8 @@ RUN npm run build
 
 # Stage 2: Production runner
 FROM node:20-alpine AS runner
+
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /usr/src/app
 

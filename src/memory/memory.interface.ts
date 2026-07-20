@@ -1,3 +1,48 @@
+export interface MemoryRecord {
+  id: string;
+  category: string;
+  key: string;
+  value: string;
+  importance: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IPersistentMemoryRepository {
+  /**
+   * Initializes database table structure automatically.
+   */
+  initialize(): Promise<void>;
+
+  /**
+   * Retrieves all memory records.
+   */
+  getAllMemories(): Promise<MemoryRecord[]>;
+
+  /**
+   * Retrieves a memory record by key and optional category.
+   */
+  getMemoryByKey(key: string, category?: string): Promise<MemoryRecord | null>;
+
+  /**
+   * Saves or updates a memory record.
+   * If a record with matching key & category exists, updates it instead of duplicating.
+   */
+  saveMemory(
+    memory: Omit<MemoryRecord, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+  ): Promise<MemoryRecord>;
+
+  /**
+   * Deletes a memory record by ID.
+   */
+  deleteMemory(id: string): Promise<boolean>;
+
+  /**
+   * Keyword-based search across category, key, and value fields.
+   */
+  searchMemories(query: string): Promise<MemoryRecord[]>;
+}
+
 export interface UserProfile {
   userId: string;
   displayName: string;
@@ -35,43 +80,12 @@ export interface ShortTermConversation {
 }
 
 export interface IMemoryRepository {
-  /**
-   * Retrieves user profile details.
-   */
   getUserProfile(userId: string): Promise<UserProfile | null>;
-
-  /**
-   * Saves or updates a user profile.
-   */
   saveUserProfile(profile: UserProfile): Promise<void>;
-
-  /**
-   * Retrieves long-term memories for a user.
-   */
   getLongTermMemory(userId: string): Promise<LongTermMemory | null>;
-
-  /**
-   * Saves or updates long-term memories.
-   */
   saveLongTermMemory(userId: string, memory: LongTermMemory): Promise<void>;
-
-  /**
-   * Retrieves all conversation sessions associated with a user.
-   */
   getConversationSessions(userId: string): Promise<ShortTermConversation[]>;
-
-  /**
-   * Retrieves a specific conversation session.
-   */
   getConversationSession(userId: string, sessionId: string): Promise<ShortTermConversation | null>;
-
-  /**
-   * Saves or updates a conversation session.
-   */
   saveConversationSession(userId: string, session: ShortTermConversation): Promise<void>;
-
-  /**
-   * Clears all memory elements for a given user.
-   */
   clearMemory(userId: string): Promise<void>;
 }

@@ -5,6 +5,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# SQLite Database
+data/
+*.db
+
 # Environment variables
 .env
 .env.local
