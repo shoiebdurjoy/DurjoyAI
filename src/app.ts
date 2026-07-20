@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import http from 'http';
 import healthRoutes from './routes/health.routes';
 import alexaRoutes from './routes/alexa.routes';
+import debugRoutes from './routes/debug.routes';
 import { requestLogger } from './middleware/logger.middleware';
 
 const app: Application = express();
@@ -39,6 +40,7 @@ app.use(
 // Routes
 app.use(healthRoutes);
 app.use(alexaRoutes);
+app.use(debugRoutes);
 
 // Catch-all route for unmatched paths (404)
 app.use((_req: Request, res: Response) => {

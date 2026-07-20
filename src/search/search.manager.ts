@@ -45,7 +45,7 @@ export class SearchManager {
 
     // 2. Indicators explicitly requiring live search
     const liveSearchPatterns = [
-      /\b(news|weather|stock price|sports score|match score|who won|latest|current|today|today's)\b/i,
+      /\b(news|weather|price|stock price|score|sports score|match score|who won|latest|current|today|today's|live|recent)\b/i,
       /\b(2026|release date|version|recent announcement|breaking news|live update)\b/i,
       /\b(latest ai model|latest model|current price|weather in|temperature in)\b/i,
     ];
