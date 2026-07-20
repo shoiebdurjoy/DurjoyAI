@@ -4,17 +4,27 @@ import { calculatorTool } from './builtin/calculator.tool';
 import { randomTool } from './builtin/random.tool';
 import { uuidTool } from './builtin/uuid.tool';
 import { systemInfoTool } from './builtin/system-info.tool';
+import { reminderTool } from '../productivity/tools/reminder.tool';
+import { taskTool } from '../productivity/tools/task.tool';
+import { calendarTool } from '../productivity/tools/calendar.tool';
+import { emailTool } from '../productivity/tools/email.tool';
 
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();
 
   constructor() {
-    // Register built-in offline tools on startup
+    // Register built-in system tools
     this.registerTool(timeTool);
     this.registerTool(calculatorTool);
     this.registerTool(randomTool);
     this.registerTool(uuidTool);
     this.registerTool(systemInfoTool);
+
+    // Register productivity suite tools
+    this.registerTool(reminderTool);
+    this.registerTool(taskTool);
+    this.registerTool(calendarTool);
+    this.registerTool(emailTool);
   }
 
   /**

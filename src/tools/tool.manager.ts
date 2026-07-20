@@ -86,6 +86,67 @@ export class ToolManager {
       };
     }
 
+    // 6. Productivity - Reminders
+    const remMatch = text.match(/remind me (to|about) (.+)/i);
+    if (remMatch) {
+      return {
+        toolId: 'reminder_tool',
+        args: { action: 'create', title: remMatch[2] },
+      };
+    }
+    if (/\b(my reminders|show reminders|upcoming reminders|check reminders)\b/i.test(text)) {
+      return {
+        toolId: 'reminder_tool',
+        args: { action: 'list' },
+      };
+    }
+
+    // 7. Productivity - Tasks
+    const taskCreateMatch = text.match(/(add|create) task:?\s*(.+)/i);
+    if (taskCreateMatch) {
+      return {
+        toolId: 'task_tool',
+        args: { action: 'create', title: taskCreateMatch[2] },
+      };
+    }
+    const taskCompMatch = text.match(/mark (task|that task) (as )?complete(d)?/i);
+    if (taskCompMatch) {
+      return {
+        toolId: 'task_tool',
+        args: { action: 'list' },
+      };
+    }
+    if (/\b(what are my tasks|my tasks|list tasks|pending tasks|task list)\b/i.test(text)) {
+      return {
+        toolId: 'task_tool',
+        args: { action: 'list' },
+      };
+    }
+
+    // 8. Productivity - Calendar
+    if (
+      /\b(do i have anything tomorrow|what's on my calendar|calendar|upcoming events|schedule)\b/i.test(
+        text,
+      )
+    ) {
+      return {
+        toolId: 'calendar_tool',
+        args: { action: 'list' },
+      };
+    }
+
+    // 9. Productivity - Emails
+    if (
+      /\b(any new emails|check inbox|unread emails|email summary|summarize emails|my emails)\b/i.test(
+        text,
+      )
+    ) {
+      return {
+        toolId: 'email_tool',
+        args: { action: 'summarize' },
+      };
+    }
+
     return null;
   }
 
@@ -129,6 +190,43 @@ export class ToolManager {
         break;
       case 'system_info':
         formattedText = `System Specs: Running on ${res.platform} (${res.arch}) with ${res.cpus} CPU cores. Memory usage is ${res.memory.usedGB} GB / ${res.memory.totalGB} GB (${res.memory.usagePercentage}%).`;
+        break;
+      case 'reminder_tool':
+        if (res.action === 'created') {
+          formattedText = `Got it! I set a reminder: "${res.reminder.title}".`;
+        } else {
+          const list = (res.reminders || []).map((r: any) => `- ${r.title}`).join('\n');
+          formattedText = list
+            ? `Here are your upcoming reminders:\n${list}`
+            : 'You have no upcoming reminders.';
+        }
+        break;
+      case 'task_tool':
+        if (res.action === 'created') {
+          formattedText = `Task added: "${res.task.title}" [Priority: ${res.task.priority.toUpperCase()}].`;
+        } else {
+          const list = (res.tasks || [])
+            .map((t: any) => `- [${t.priority.toUpperCase()}] ${t.title}`)
+            .join('\n');
+          formattedText = list
+            ? `Here are your pending tasks:\n${list}`
+            : 'You have no pending tasks.';
+        }
+        break;
+      case 'calendar_tool':
+        if (res.action === 'created') {
+          formattedText = `Event added to calendar: "${res.event.title}".`;
+        } else {
+          const list = (res.events || [])
+            .map((e: any) => `- ${e.title} at ${new Date(e.startTime).toLocaleTimeString()}`)
+            .join('\n');
+          formattedText = list
+            ? `Here is your upcoming schedule:\n${list}`
+            : 'You have no events scheduled on your calendar.';
+        }
+        break;
+      case 'email_tool':
+        formattedText = res.summary || 'Email Inbox checked.';
         break;
       default:
         formattedText = `Tool Result: ${JSON.stringify(res)}`;
