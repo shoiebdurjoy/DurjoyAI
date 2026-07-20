@@ -44,13 +44,17 @@ describe('Critical Production Polish & Live Alexa Unit & Integration Tests', () 
     assert.ok(res.includes('remember') || res.includes('know'));
   });
 
-  it('should return 3-word fast launch response for LaunchRequest', async () => {
+  it('should return 3-word fast launch response for LaunchRequest with shouldEndSession false', async () => {
     let responseData: any;
     const req = {
       body: {
         version: '1.0',
-        session: { sessionId: 's-launch' },
-        request: { type: 'LaunchRequest', requestId: 'r-launch' },
+        session: { sessionId: 'amzn1.echo-api.session.launch', user: { userId: 'uid-test' } },
+        request: {
+          type: 'LaunchRequest',
+          requestId: 'r-launch',
+          timestamp: new Date().toISOString(),
+        },
       },
     } as any;
 
@@ -68,5 +72,6 @@ describe('Critical Production Polish & Live Alexa Unit & Integration Tests', () 
 
     assert.strictEqual(responseData.version, '1.0');
     assert.strictEqual(responseData.response.outputSpeech.text, 'Durjoy AI ready.');
+    assert.strictEqual(responseData.response.shouldEndSession, false);
   });
 });
