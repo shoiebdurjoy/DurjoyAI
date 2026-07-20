@@ -4,7 +4,7 @@ import { aiService } from '../ai/ai.service';
 
 /**
  * Helper to extract user input from slots in an Alexa IntentRequest.
- * It searches through all slots and returns the value of the first populated slot.
+ * It checks the `prompt` slot first, then falls back to any other populated slot.
  *
  * @param alexaRequest The incoming Alexa request body
  * @returns The user prompt text if found, or null otherwise
@@ -16,6 +16,16 @@ function extractUserPrompt(alexaRequest: any): string | null {
     return null;
   }
 
+  // Check prompt slot specifically if present
+  if (
+    slots.prompt &&
+    typeof slots.prompt.value === 'string' &&
+    slots.prompt.value.trim().length > 0
+  ) {
+    return slots.prompt.value.trim();
+  }
+
+  // Fallback to any populated slot
   for (const slotKey in slots) {
     if (Object.prototype.hasOwnProperty.call(slots, slotKey)) {
       const slot = slots[slotKey];
@@ -31,7 +41,7 @@ function extractUserPrompt(alexaRequest: any): string | null {
 export class AlexaController {
   /**
    * Handles incoming HTTP POST requests from Amazon Alexa Skills Kit.
-   * Logs interaction meta-data safely and returns the structured JSON responses.
+   * Logs interaction meta-data safely and returns structured JSON responses.
    *
    * @param req Express Request object
    * @param res Express Response object
@@ -75,14 +85,32 @@ export class AlexaController {
           // eslint-disable-next-line no-console
           console.log(`[Alexa Request] Intent Name: ${intentName}`);
 
+          // Handle built-in intents
+          if (intentName === 'AMAZON.StopIntent' || intentName === 'AMAZON.CancelIntent') {
+            const response = buildAlexaResponse('Catch you later, man!', true);
+            res.status(200).json(response);
+            break;
+          }
+
+          if (intentName === 'AMAZON.HelpIntent') {
+            const response = buildAlexaResponse(
+              'Yo! Ask me anything, like capital of Bangladesh, who created Python, or tell me a joke!',
+              false,
+              'Yo, what do you want to ask?',
+            );
+            res.status(200).json(response);
+            break;
+          }
+
+          // Handle ChatIntent and custom intents
           const userPrompt = extractUserPrompt(alexaRequest);
           if (!userPrompt) {
             // eslint-disable-next-line no-console
-            console.log('[Alexa Request] Empty or missing user prompt.');
+            console.log('[Alexa Request] Empty or missing user prompt slot.');
             const response = buildAlexaResponse(
-              'Yo, say that again, man.',
+              'Yo, what do you want to ask?',
               false,
-              'Yo, say that again, man.',
+              'Yo, what do you want to ask?',
             );
             res.status(200).json(response);
             break;
@@ -98,9 +126,9 @@ export class AlexaController {
               // eslint-disable-next-line no-console
               console.warn('[Alexa Request] AI service returned an empty response.');
               const response = buildAlexaResponse(
-                'Yo, say that again, man.',
+                'Yo, what do you want to ask?',
                 false,
-                'Yo, say that again, man.',
+                'Yo, what do you want to ask?',
               );
               res.status(200).json(response);
             } else {
@@ -115,9 +143,9 @@ export class AlexaController {
             // eslint-disable-next-line no-console
             console.error('[Alexa Request] Error invoking AI service:', aiError);
             const response = buildAlexaResponse(
-              'Yo, something went wrong. Give me another shot in a moment.',
+              'Yo, something went wrong. Try again in a moment.',
               false,
-              'Give me another shot in a moment.',
+              'Try again in a moment.',
             );
             res.status(200).json(response);
           }

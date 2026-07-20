@@ -1,0 +1,46 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "durjoy ai",
+      "intents": [
+        {
+          "name": "ChatIntent",
+          "slots": [
+            {
+              "name": "prompt",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "{prompt}",
+            "ask {prompt}",
+            "tell me {prompt}",
+            "what is {prompt}",
+            "who is {prompt}",
+            "explain {prompt}",
+            "search for {prompt}",
+            "how do i {prompt}",
+            "can you {prompt}"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": []
+    }
+  }
+}
