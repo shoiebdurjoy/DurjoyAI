@@ -5,12 +5,13 @@ export interface SystemPromptOptions {
   userId?: string;
   contextSummary?: string;
   conversationContext?: string;
+  webSearchContext?: string;
 }
 
 export class PersonalityService {
   /**
    * Generates a consistent, provider-independent system prompt for AI requests.
-   * Assembles Personality + Brain 0 + Relevant Long-Term Memories + Short-Term Dialogue History.
+   * Assembles Personality + Brain 0 + Relevant Long-Term Memories + Dialogue History + Live Search Context.
    *
    * @param options System prompt context options
    * @returns Formatted system prompt text string
@@ -33,6 +34,10 @@ export class PersonalityService {
 
     if (options?.conversationContext) {
       prompt += `\n\nRECENT CONVERSATION HISTORY:\n${options.conversationContext}`;
+    }
+
+    if (options?.webSearchContext) {
+      prompt += `\n\n${options.webSearchContext}\nInstructions: Use the live web search information above to answer accurately. Mention sources naturally when helpful without exposing raw implementation details.`;
     }
 
     return prompt.trim();
