@@ -6,51 +6,82 @@ export class DuckDuckGoSearchProvider implements ISearchProvider {
   public async search(query: string, limit = 5): Promise<SearchResponse> {
     const startTime = Date.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     try {
-      const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`;
-      const res = await fetch(apiUrl, { signal: controller.signal });
+      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        signal: controller.signal,
+      });
+
       clearTimeout(timeout);
 
       if (!res.ok) {
-        throw new Error(`DuckDuckGo API responded with status ${res.status}`);
+        throw new Error(`DuckDuckGo responded with status ${res.status}`);
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await res.json();
+      const html = await res.text();
       const results: SearchItem[] = [];
 
-      if (data.AbstractText && data.AbstractURL) {
-        results.push({
-          title: data.Heading || query,
-          url: data.AbstractURL,
-          snippet: data.AbstractText,
-          source: data.AbstractSource || 'DuckDuckGo Abstract',
-        });
-      }
+      // Regex pattern to extract titles, URLs, and snippets from DuckDuckGo HTML results
+      const resultBlockRegex =
+        /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>|<td[^>]*class="result-snippet"[^>]*>([\s\S]*?)<\/td>)/gi;
 
-      if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
-        for (const topic of data.RelatedTopics) {
-          if (topic.Text && topic.FirstURL && results.length < limit) {
-            results.push({
-              title: topic.Text.split(' - ')[0] || topic.Text.substring(0, 50),
-              url: topic.FirstURL,
-              snippet: topic.Text,
-              source: 'DuckDuckGo Related Topics',
-            });
+      let match;
+      while ((match = resultBlockRegex.exec(html)) !== null && results.length < limit) {
+        let rawUrl = match[1];
+        const title = match[2].replace(/<[^>]+>/g, '').trim();
+        const snippet = (match[3] || match[4] || '').replace(/<[^>]+>/g, '').trim();
+
+        // Extract actual URL if redirected via duckduckgo.com/l/?uddg=
+        if (rawUrl.includes('uddg=')) {
+          const urlMatch = rawUrl.match(/uddg=([^&]+)/);
+          if (urlMatch) {
+            rawUrl = decodeURIComponent(urlMatch[1]);
           }
+        } else if (rawUrl.startsWith('//')) {
+          rawUrl = 'https:' + rawUrl;
+        }
+
+        if (title && rawUrl && snippet) {
+          results.push({
+            title,
+            url: rawUrl,
+            snippet,
+            source: 'DuckDuckGo Web',
+          });
         }
       }
 
-      // Fallback result if API returns no structured abstract
+      // Secondary fallback regex if the primary result block pattern was strict
       if (results.length === 0) {
-        results.push({
-          title: `Search results for ${query}`,
-          url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-          snippet: `Live search query results for '${query}'.`,
-          source: 'DuckDuckGo Web',
-        });
+        const linkRegex = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+        let linkMatch;
+        while ((linkMatch = linkRegex.exec(html)) !== null && results.length < limit) {
+          let rawUrl = linkMatch[1];
+          const title = linkMatch[2].replace(/<[^>]+>/g, '').trim();
+
+          if (rawUrl.includes('uddg=')) {
+            const urlMatch = rawUrl.match(/uddg=([^&]+)/);
+            if (urlMatch) {
+              rawUrl = decodeURIComponent(urlMatch[1]);
+            }
+          }
+
+          if (title && rawUrl) {
+            results.push({
+              title,
+              url: rawUrl,
+              snippet: `Live result for: ${title}`,
+              source: 'DuckDuckGo Web',
+            });
+          }
+        }
       }
 
       return {

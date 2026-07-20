@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+process.env.NODE_ENV = 'test';
+
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { personalityService } from './personality.service';

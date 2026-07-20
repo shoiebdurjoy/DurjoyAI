@@ -6,22 +6,27 @@ import { TavilySearchProvider } from './providers/tavily.provider';
 export class SearchFactory {
   /**
    * Resolves the active web search provider based on environment variables.
-   * Defaults to 'duckduckgo' in production and 'mock' in test mode.
+   * Defaults to 'duckduckgo'.
    *
    * @returns ISearchProvider instance.
+   * @throws Error if mock search provider is requested in production environment.
    */
   public static getProvider(): ISearchProvider {
-    const providerName = (process.env.SEARCH_PROVIDER || '').toLowerCase();
+    const isProd = process.env.NODE_ENV === 'production';
+    const providerName = (process.env.SEARCH_PROVIDER || 'duckduckgo').toLowerCase();
 
-    if (process.env.NODE_ENV === 'test' || providerName === 'mock') {
-      return new MockSearchProvider();
+    if (isProd && providerName === 'mock') {
+      throw new Error('MockSearchProvider is strictly forbidden in production environment.');
     }
 
     if (providerName === 'tavily') {
       return new TavilySearchProvider();
     }
 
-    // Default search provider
+    if (providerName === 'mock' && process.env.NODE_ENV === 'test') {
+      return new MockSearchProvider();
+    }
+
     return new DuckDuckGoSearchProvider();
   }
 }
