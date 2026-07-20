@@ -11,11 +11,13 @@ interface OpenRouterResponse {
 export class OpenRouterProvider implements AIProvider {
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly maxTokens: number;
   private readonly timeoutMs: number;
 
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY || '';
     this.model = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
+    this.maxTokens = parseInt(process.env.OPENROUTER_MAX_TOKENS || '512', 10);
     // Use an 8-second request timeout by default
     this.timeoutMs = parseInt(process.env.OPENROUTER_TIMEOUT_MS || '8000', 10);
   }
@@ -46,6 +48,7 @@ export class OpenRouterProvider implements AIProvider {
         },
         body: JSON.stringify({
           model: this.model,
+          max_tokens: this.maxTokens,
           messages: [
             {
               role: 'user',
