@@ -64,6 +64,7 @@ export class AlexaController {
           const response = buildAlexaResponse(
             "Yo! I'm Durjoy AI. What's up? What can I help you with today?",
             false,
+            'What can I help you with today?',
           );
           res.status(200).json(response);
           break;
@@ -78,7 +79,11 @@ export class AlexaController {
           if (!userPrompt) {
             // eslint-disable-next-line no-console
             console.log('[Alexa Request] Empty or missing user prompt.');
-            const response = buildAlexaResponse('Yo, say that again, man.', false);
+            const response = buildAlexaResponse(
+              'Yo, say that again, man.',
+              false,
+              'Yo, say that again, man.',
+            );
             res.status(200).json(response);
             break;
           }
@@ -92,10 +97,18 @@ export class AlexaController {
             if (!aiResponse || aiResponse.trim().length === 0) {
               // eslint-disable-next-line no-console
               console.warn('[Alexa Request] AI service returned an empty response.');
-              const response = buildAlexaResponse('Yo, say that again, man.', false);
+              const response = buildAlexaResponse(
+                'Yo, say that again, man.',
+                false,
+                'Yo, say that again, man.',
+              );
               res.status(200).json(response);
             } else {
-              const response = buildAlexaResponse(aiResponse, false);
+              const response = buildAlexaResponse(
+                aiResponse,
+                false,
+                'What else can I help you with?',
+              );
               res.status(200).json(response);
             }
           } catch (aiError) {
@@ -104,6 +117,7 @@ export class AlexaController {
             const response = buildAlexaResponse(
               'Yo, something went wrong. Give me another shot in a moment.',
               false,
+              'Give me another shot in a moment.',
             );
             res.status(200).json(response);
           }
