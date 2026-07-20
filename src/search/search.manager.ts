@@ -1,5 +1,6 @@
 import { ISearchProvider, SearchResponse, SearchItem, SearchLog } from './search.interface';
 import { SearchFactory } from './search.factory';
+import { Logger } from '../utils/logger';
 
 export interface CacheEntry {
   response: SearchResponse;
@@ -76,6 +77,7 @@ export class SearchManager {
         true,
         cachedEntry.response.results.length,
       );
+      Logger.debug('SearchManager', `Cache hit for search query: '${query}'`);
       return {
         ...cachedEntry.response,
         cached: true,
@@ -109,11 +111,17 @@ export class SearchManager {
       });
 
       this.logSearch(query, activeProvider.name, duration, false, true, deduplicatedResults.length);
+      Logger.info(
+        'SearchManager',
+        `Web search executed via '${activeProvider.name}' in ${duration}ms (${deduplicatedResults.length} results)`,
+      );
+
       return finalResponse;
     } catch (err: unknown) {
       const duration = Date.now() - startTime;
       const errMsg = err instanceof Error ? err.message : 'Search error occurred';
       this.logSearch(query, activeProvider.name, duration, false, false, 0, errMsg);
+      Logger.error('SearchManager', `Web search failed via '${activeProvider.name}'`, errMsg);
 
       return {
         query,

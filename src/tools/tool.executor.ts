@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ToolExecutionResult, ToolExecutionLog } from './tool.interface';
 import { toolRegistry, ToolRegistry } from './tool.registry';
+import { Logger } from '../utils/logger';
 
 export interface ExecutionOptions {
   confirmed?: boolean;
@@ -31,6 +32,7 @@ export class ToolExecutor {
     if (!tool) {
       const duration = Date.now() - startTime;
       this.logExecution(toolId, duration, false, 'SAFE', `Unknown tool: ${toolId}`);
+      Logger.warn('ToolExecutor', `Execution requested for unknown tool '${toolId}'`);
       return {
         toolId,
         success: false,
@@ -42,6 +44,7 @@ export class ToolExecutor {
     if (!tool.enabled) {
       const duration = Date.now() - startTime;
       this.logExecution(toolId, duration, false, tool.permissionLevel, 'Tool disabled');
+      Logger.warn('ToolExecutor', `Execution requested for disabled tool '${tool.name}'`);
       return {
         toolId,
         success: false,
@@ -54,6 +57,7 @@ export class ToolExecutor {
     if (tool.permissionLevel === 'CONFIRM_REQUIRED' && !options?.confirmed) {
       const duration = Date.now() - startTime;
       this.logExecution(toolId, duration, false, tool.permissionLevel, 'Confirmation required');
+      Logger.info('ToolExecutor', `Tool '${tool.name}' blocked - user confirmation required.`);
       return {
         toolId,
         success: false,
@@ -67,6 +71,7 @@ export class ToolExecutor {
     if (tool.permissionLevel === 'ADMIN' && options?.userRole !== 'admin') {
       const duration = Date.now() - startTime;
       this.logExecution(toolId, duration, false, tool.permissionLevel, 'Admin rights required');
+      Logger.warn('ToolExecutor', `Tool '${tool.name}' blocked - administrator rights required.`);
       return {
         toolId,
         success: false,
@@ -81,6 +86,7 @@ export class ToolExecutor {
       const duration = Date.now() - startTime;
 
       this.logExecution(toolId, duration, true, tool.permissionLevel);
+      Logger.info('ToolExecutor', `Executed tool '${tool.id}' successfully in ${duration}ms`);
 
       return {
         toolId: tool.id,
@@ -93,6 +99,7 @@ export class ToolExecutor {
       const cleanError = err?.message || 'An unexpected tool execution error occurred.';
 
       this.logExecution(toolId, duration, false, tool.permissionLevel, cleanError);
+      Logger.error('ToolExecutor', `Execution failed for tool '${tool.id}'`, cleanError);
 
       return {
         toolId: tool.id,

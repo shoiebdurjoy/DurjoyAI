@@ -82,7 +82,7 @@ describe('Natural Conversation & Automatic Memory Learning Tests', () => {
     assert.ok(prompt.includes('Durjoy AI'));
     assert.ok(prompt.includes('RELEVANT MEMORY CONTEXT:'));
     assert.ok(prompt.includes('Device | Laptop: Lenovo Legion'));
-    assert.ok(prompt.includes('RECENT CONVERSATION HISTORY:'));
+    assert.ok(prompt.includes('RECENT DIALOGUE:'));
     assert.ok(prompt.includes('User: What GPU does it have?'));
   });
 

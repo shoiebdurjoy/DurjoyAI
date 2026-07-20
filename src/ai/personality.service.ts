@@ -10,8 +10,8 @@ export interface SystemPromptOptions {
 
 export class PersonalityService {
   /**
-   * Generates a consistent, provider-independent system prompt for AI requests.
-   * Assembles Personality + Brain 0 + Relevant Long-Term Memories + Dialogue History + Live Search Context.
+   * Generates an optimized, provider-independent system prompt for AI completions.
+   * Assembles Voice Rules + Owner Profile + Memory Context + Session Dialogue + Live Web Search.
    *
    * @param options System prompt context options
    * @returns Formatted system prompt text string
@@ -23,24 +23,27 @@ export class PersonalityService {
       .map((rule, idx) => `${idx + 1}. ${rule}`)
       .join('\n');
 
-    let prompt =
-      `You are ${DEFAULT_PERSONALITY_CONFIG.assistantName}, a personal AI assistant.\n\n` +
-      `PERSONALITY & VOICE INSTRUCTIONS:\n${rulesBlock}\n\n` +
-      `${ownerContext}`;
+    const sections: string[] = [
+      `You are ${DEFAULT_PERSONALITY_CONFIG.assistantName}, a personal AI assistant.`,
+      `VOICE RULES:\n${rulesBlock}`,
+      ownerContext,
+    ];
 
     if (options?.contextSummary) {
-      prompt += `\n\nRELEVANT MEMORY CONTEXT:\n${options.contextSummary}`;
+      sections.push(`RELEVANT MEMORY CONTEXT:\n${options.contextSummary}`);
     }
 
     if (options?.conversationContext) {
-      prompt += `\n\nRECENT CONVERSATION HISTORY:\n${options.conversationContext}`;
+      sections.push(`RECENT DIALOGUE:\n${options.conversationContext}`);
     }
 
     if (options?.webSearchContext) {
-      prompt += `\n\n${options.webSearchContext}\nInstructions: Use the live web search information above to answer accurately. Mention sources naturally when helpful without exposing raw implementation details.`;
+      sections.push(
+        `${options.webSearchContext}\nInstructions: Use the search data above accurately. Attribute sources naturally when helpful.`,
+      );
     }
 
-    return prompt.trim();
+    return sections.join('\n\n').trim();
   }
 }
 
