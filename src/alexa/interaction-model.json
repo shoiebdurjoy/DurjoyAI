@@ -19,8 +19,32 @@
             "explain {prompt}",
             "search for {prompt}",
             "how do i {prompt}",
-            "can you {prompt}"
+            "can you {prompt}",
+            "weather {prompt}",
+            "score {prompt}",
+            "news {prompt}",
+            "remember {prompt}",
+            "remind me {prompt}",
+            "check {prompt}",
+            "get {prompt}",
+            "find {prompt}",
+            "show me {prompt}",
+            "give me {prompt}",
+            "do you know {prompt}",
+            "how {prompt}",
+            "what {prompt}",
+            "when {prompt}",
+            "where {prompt}",
+            "why {prompt}",
+            "is {prompt}",
+            "my {prompt}",
+            "latest {prompt}",
+            "today {prompt}"
           ]
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
         },
         {
           "name": "AMAZON.CancelIntent",

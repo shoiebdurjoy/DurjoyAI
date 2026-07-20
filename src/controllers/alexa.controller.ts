@@ -5,7 +5,7 @@ import { Logger } from '../utils/logger';
 
 /**
  * Helper to extract user input from slots in an Alexa IntentRequest.
- * It checks the `prompt` slot first, then falls back to any other populated slot.
+ * Checks the `prompt` slot first, then falls back to any other populated slot.
  *
  * @param alexaRequest The incoming Alexa request body
  * @returns The user prompt text if found, or null otherwise
@@ -72,18 +72,18 @@ export class AlexaController {
 
       switch (requestType) {
         case 'LaunchRequest': {
-          // Part 2: Fast launch speech (3 words max)
+          // Fast launch speech (3 words max) - keep session open (shouldEndSession: false)
           const response = buildAlexaResponse('Durjoy AI ready.', false, 'How can I help?');
           Logger.info(
             'AlexaController',
-            'Alexa response sent for LaunchRequest: "Durjoy AI ready."',
+            'Alexa response sent for LaunchRequest: "Durjoy AI ready." (shouldEndSession: false)',
           );
           res.status(200).json(response);
           break;
         }
 
         case 'IntentRequest': {
-          const intentName = alexaRequest.request.intent?.name || 'UnknownIntent';
+          const intentName = alexaRequest.request.intent?.name || 'ChatIntent';
           Logger.info('AlexaController', `Intent Name: ${intentName}`);
 
           // Handle built-in stop/cancel intents
@@ -105,21 +105,27 @@ export class AlexaController {
             break;
           }
 
-          // Handle ChatIntent and custom intents
+          // Handle ChatIntent, AMAZON.FallbackIntent, and custom intents
           const userPrompt = extractUserPrompt(alexaRequest);
           if (!userPrompt) {
-            Logger.warn('AlexaController', 'Empty or missing user prompt slot.');
+            Logger.warn(
+              'AlexaController',
+              `Empty or missing prompt slot for intent ${intentName}.`,
+            );
             const response = buildAlexaResponse(
               'How can I help you today?',
               false,
               'How can I help you today?',
             );
-            Logger.info('AlexaController', 'Alexa response sent for empty slot prompt.');
+            Logger.info('AlexaController', 'Alexa response sent for missing slot prompt.');
             res.status(200).json(response);
             break;
           }
 
-          Logger.info('AlexaController', `Extracted prompt: "${userPrompt}"`);
+          Logger.info(
+            'AlexaController',
+            `ChatIntent [${intentName}] Extracted prompt: "${userPrompt}"`,
+          );
 
           try {
             const aiResponse = await aiService.generateResponse(userPrompt, {
@@ -138,7 +144,10 @@ export class AlexaController {
               'What else can I help you with?',
             );
 
-            Logger.info('AlexaController', `Alexa response sent: "${speechOutput}"`);
+            Logger.info(
+              'AlexaController',
+              `Alexa response sent: "${speechOutput}" (shouldEndSession: false)`,
+            );
             res.status(200).json(response);
           } catch (aiError) {
             Logger.error('AlexaController', 'Error invoking AIService pipeline', aiError);
