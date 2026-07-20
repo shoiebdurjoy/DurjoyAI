@@ -13,7 +13,7 @@ describe('Personality Engine Unit & Integration Tests', () => {
     const systemPrompt = await personalityService.getSystemPrompt();
 
     assert.ok(systemPrompt.includes('You are Durjoy AI, a personal AI assistant.'));
-    assert.ok(systemPrompt.includes('Be friendly, confident, and modern.'));
+    assert.ok(systemPrompt.includes('Be friendly, confident, modern, and direct.'));
     assert.ok(systemPrompt.includes('Never use markdown formatting'));
     assert.ok(systemPrompt.includes('Owner Name: Durjoy'));
     assert.ok(systemPrompt.includes('BRAC University'));

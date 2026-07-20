@@ -63,7 +63,7 @@ describe('Complete Tool Invocation Pipeline Integration Tests', () => {
 
     const logs = customSearchManager.getLogs();
     assert.ok(logs.length > 0);
-    assert.strictEqual(logs[logs.length - 1].query, prompt);
+    assert.strictEqual(logs[logs.length - 1].query.toLowerCase(), prompt.toLowerCase());
     assert.strictEqual(logs[logs.length - 1].provider, 'mock');
   });
 

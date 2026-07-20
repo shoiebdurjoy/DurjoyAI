@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { buildAlexaResponse, buildAlexaEmptyResponse } from '../utils/alexa-response';
 import { aiService } from '../ai/ai.service';
+import { Logger } from '../utils/logger';
 
 /**
  * Helper to extract user input from slots in an Alexa IntentRequest.
@@ -50,8 +51,8 @@ export class AlexaController {
     try {
       const alexaRequest = req.body;
 
-      // Validate the basic request structure
       if (!alexaRequest || !alexaRequest.request) {
+        Logger.warn('AlexaController', 'Malformed request. Missing Alexa request body.');
         res.status(400).json({
           status: 'error',
           message: 'Malformed request. Missing Alexa request body.',
@@ -62,19 +63,20 @@ export class AlexaController {
       const requestType = alexaRequest.request.type;
       const requestId = alexaRequest.request.requestId;
       const sessionId = alexaRequest.session?.sessionId || 'N/A';
+      const userId = alexaRequest.session?.user?.userId || 'alexa-user';
 
-      // Safe logging (excludes user access tokens / user-specific identifiers)
-      // eslint-disable-next-line no-console
-      console.log(
-        `[Alexa Request] Type: ${requestType} | RequestId: ${requestId} | SessionId: ${sessionId}`,
+      Logger.info(
+        'AlexaController',
+        `Incoming Alexa Request | Type: ${requestType} | RequestId: ${requestId} | SessionId: ${sessionId}`,
       );
 
       switch (requestType) {
         case 'LaunchRequest': {
-          const response = buildAlexaResponse(
-            "Yo! I'm Durjoy AI. What's up? What can I help you with today?",
-            false,
-            'What can I help you with today?',
+          // Part 2: Fast launch speech (3 words max)
+          const response = buildAlexaResponse('Durjoy AI ready.', false, 'How can I help?');
+          Logger.info(
+            'AlexaController',
+            'Alexa response sent for LaunchRequest: "Durjoy AI ready."',
           );
           res.status(200).json(response);
           break;
@@ -82,22 +84,23 @@ export class AlexaController {
 
         case 'IntentRequest': {
           const intentName = alexaRequest.request.intent?.name || 'UnknownIntent';
-          // eslint-disable-next-line no-console
-          console.log(`[Alexa Request] Intent Name: ${intentName}`);
+          Logger.info('AlexaController', `Intent Name: ${intentName}`);
 
-          // Handle built-in intents
+          // Handle built-in stop/cancel intents
           if (intentName === 'AMAZON.StopIntent' || intentName === 'AMAZON.CancelIntent') {
-            const response = buildAlexaResponse('Catch you later, man!', true);
+            const response = buildAlexaResponse('Goodbye!', true);
+            Logger.info('AlexaController', 'Alexa response sent for Stop/CancelIntent: "Goodbye!"');
             res.status(200).json(response);
             break;
           }
 
           if (intentName === 'AMAZON.HelpIntent') {
             const response = buildAlexaResponse(
-              'Yo! Ask me anything, like capital of Bangladesh, who created Python, or tell me a joke!',
+              'Ask me anything, like latest news, weather, or reminders!',
               false,
-              'Yo, what do you want to ask?',
+              'What would you like to ask?',
             );
+            Logger.info('AlexaController', 'Alexa response sent for HelpIntent.');
             res.status(200).json(response);
             break;
           }
@@ -105,48 +108,47 @@ export class AlexaController {
           // Handle ChatIntent and custom intents
           const userPrompt = extractUserPrompt(alexaRequest);
           if (!userPrompt) {
-            // eslint-disable-next-line no-console
-            console.log('[Alexa Request] Empty or missing user prompt slot.');
+            Logger.warn('AlexaController', 'Empty or missing user prompt slot.');
             const response = buildAlexaResponse(
-              'Yo, what do you want to ask?',
+              'How can I help you today?',
               false,
-              'Yo, what do you want to ask?',
+              'How can I help you today?',
             );
+            Logger.info('AlexaController', 'Alexa response sent for empty slot prompt.');
             res.status(200).json(response);
             break;
           }
 
-          // eslint-disable-next-line no-console
-          console.log(`[Alexa Request] Extracted prompt: "${userPrompt}"`);
+          Logger.info('AlexaController', `Extracted prompt: "${userPrompt}"`);
 
           try {
-            const aiResponse = await aiService.generateResponse(userPrompt);
+            const aiResponse = await aiService.generateResponse(userPrompt, {
+              userId,
+              sessionId,
+            });
 
-            if (!aiResponse || aiResponse.trim().length === 0) {
-              // eslint-disable-next-line no-console
-              console.warn('[Alexa Request] AI service returned an empty response.');
-              const response = buildAlexaResponse(
-                'Yo, what do you want to ask?',
-                false,
-                'Yo, what do you want to ask?',
-              );
-              res.status(200).json(response);
-            } else {
-              const response = buildAlexaResponse(
-                aiResponse,
-                false,
-                'What else can I help you with?',
-              );
-              res.status(200).json(response);
-            }
-          } catch (aiError) {
-            // eslint-disable-next-line no-console
-            console.error('[Alexa Request] Error invoking AI service:', aiError);
+            const speechOutput =
+              !aiResponse || aiResponse.trim().length === 0
+                ? 'How can I help you today?'
+                : aiResponse;
+
             const response = buildAlexaResponse(
-              'Yo, something went wrong. Try again in a moment.',
+              speechOutput,
               false,
-              'Try again in a moment.',
+              'What else can I help you with?',
             );
+
+            Logger.info('AlexaController', `Alexa response sent: "${speechOutput}"`);
+            res.status(200).json(response);
+          } catch (aiError) {
+            Logger.error('AlexaController', 'Error invoking AIService pipeline', aiError);
+            const fallbackSpeech = "I didn't quite catch that. Could you try asking again?";
+            const response = buildAlexaResponse(
+              fallbackSpeech,
+              false,
+              'Could you try asking again?',
+            );
+            Logger.info('AlexaController', `Alexa fallback response sent: "${fallbackSpeech}"`);
             res.status(200).json(response);
           }
           break;
@@ -154,8 +156,7 @@ export class AlexaController {
 
         case 'SessionEndedRequest': {
           const reason = alexaRequest.request.reason || 'UNKNOWN';
-          // eslint-disable-next-line no-console
-          console.log(`[Alexa Request] Session Ended. Reason: ${reason}`);
+          Logger.info('AlexaController', `Session Ended. Reason: ${reason}`);
 
           const response = buildAlexaEmptyResponse();
           res.status(200).json(response);
@@ -163,24 +164,22 @@ export class AlexaController {
         }
 
         default: {
-          // eslint-disable-next-line no-console
-          console.warn(`[Alexa Request] Unhandled request type: ${requestType}`);
+          Logger.warn('AlexaController', `Unhandled request type: ${requestType}`);
 
-          const response = buildAlexaResponse(
-            'Sorry, I am not sure how to process that request.',
-            true,
-          );
+          const response = buildAlexaResponse('Durjoy AI ready.', false, 'How can I help?');
+          Logger.info('AlexaController', 'Alexa response sent for unhandled request type.');
           res.status(200).json(response);
           break;
         }
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Error in Alexa webhook handler:', error);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal server error processing Alexa request.',
-      });
+      Logger.error('AlexaController', 'Unhandled exception in Alexa webhook handler', error);
+      const errorResponse = buildAlexaResponse(
+        'Durjoy AI is ready. What can I help you with?',
+        false,
+        'What can I help you with?',
+      );
+      res.status(200).json(errorResponse);
     }
   };
 }

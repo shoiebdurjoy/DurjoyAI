@@ -9,6 +9,7 @@ import { memoryExtractorService, MemoryExtractorService } from '../memory/memory
 import { toolManager, ToolManager } from '../tools/tool.manager';
 import { searchManager, SearchManager } from '../search/search.manager';
 import { reasoningManager, ReasoningManager } from '../reasoning/reasoning.manager';
+import { normalizeQuery } from '../utils/query-normalizer';
 import { Logger } from '../utils/logger';
 
 export interface AIServiceOptions {
@@ -29,15 +30,15 @@ export class AIService {
   ) {}
 
   /**
-   * Generates an AI response by checking deterministic reasoning, tools, web search,
-   * memories, dialogue history, and delegating to active providers.
+   * Generates an AI response by checking normalization, deterministic reasoning, tools,
+   * web search, memories, dialogue history, and delegating to active providers with retries.
    *
-   * @param prompt The input user prompt.
+   * @param rawPrompt The input user prompt.
    * @param options Optional userId, sessionId, or confirmed flags.
    * @returns A promise resolving to the text response.
    */
   public async generateResponse(
-    prompt: string,
+    rawPrompt: string,
     options?: AIServiceOptions | string,
   ): Promise<string> {
     const userId = typeof options === 'string' ? options : options?.userId || 'default-user';
@@ -45,102 +46,150 @@ export class AIService {
       typeof options === 'object' ? options?.sessionId || 'default-session' : 'default-session';
     const confirmed = typeof options === 'object' ? options?.confirmed || false : false;
 
-    // 1. Log Incoming User Prompt
-    Logger.info('AIService', `Incoming user prompt: "${prompt}"`);
+    // 1. Normalize Query for Typo / Phonetic Speech Tolerance
+    const prompt = normalizeQuery(rawPrompt);
+    Logger.info('AIService', `Incoming prompt: "${rawPrompt}" -> Normalized: "${prompt}"`);
 
-    // 2. Deterministic Calculation Engine Check
-    if (this.reasoning.isDeterministicQuery(prompt)) {
-      Logger.info('AIService', 'Intent classification: Deterministic Reasoning');
-      const deterministicRes = this.reasoning.resolveDeterministicAnswer(prompt);
-      if (deterministicRes) {
-        await this.session.appendMessage(userId, sessionId, 'user', prompt);
-        await this.session.appendMessage(
-          userId,
-          sessionId,
-          'assistant',
-          deterministicRes.explanation,
-        );
-        return deterministicRes.explanation;
+    try {
+      // 2. Deterministic Calculation Engine Check
+      if (this.reasoning.isDeterministicQuery(prompt)) {
+        Logger.info('AIService', 'Intent classification: Deterministic Reasoning');
+        const deterministicRes = this.reasoning.resolveDeterministicAnswer(prompt);
+        if (deterministicRes) {
+          Logger.info('AIService', `Calculation execution: ${deterministicRes.explanation}`);
+          await this.session.appendMessage(userId, sessionId, 'user', prompt);
+          await this.session.appendMessage(
+            userId,
+            sessionId,
+            'assistant',
+            deterministicRes.explanation,
+          );
+          return deterministicRes.explanation;
+        }
       }
-    }
 
-    // 3. Tool Framework Routing & Execution
-    const toolCall = this.tools.determineToolSelection(prompt);
-    if (toolCall) {
-      Logger.info('AIService', `Intent classification: Tool Invocation (${toolCall.toolId})`);
-      Logger.info('AIService', `Selected tool: "${toolCall.toolId}"`);
+      // 3. Special Memory Query Inspection ("What do you remember about me?")
+      if (/\b(what do you remember|what do you know about me|remember about me)\b/i.test(prompt)) {
+        Logger.info('AIService', 'Intent classification: Memory Lookup Query');
+        const allMems = await this.memory.getAllMemories();
+        if (allMems.length === 0) {
+          const emptyMemMsg = "I don't know much about you yet. Tell me something about yourself!";
+          await this.session.appendMessage(userId, sessionId, 'user', prompt);
+          await this.session.appendMessage(userId, sessionId, 'assistant', emptyMemMsg);
+          return emptyMemMsg;
+        }
+        const memSummary = allMems.map((m) => `${m.category}: ${m.key} is ${m.value}`).join(', ');
+        const memAns = `Here is what I remember: ${memSummary}`;
+        await this.session.appendMessage(userId, sessionId, 'user', prompt);
+        await this.session.appendMessage(userId, sessionId, 'assistant', memAns);
+        return memAns;
+      }
+
+      // 4. Tool Framework Routing & Execution
+      const toolCall = this.tools.determineToolSelection(prompt);
+      if (toolCall) {
+        Logger.info('AIService', `Intent classification: Tool Invocation (${toolCall.toolId})`);
+        Logger.info('AIService', `Tool selection: "${toolCall.toolId}"`);
+        Logger.info(
+          'AIService',
+          `Tool execution start: "${toolCall.toolId}" params: ${JSON.stringify(toolCall.args)}`,
+        );
+
+        const toolResult = await this.tools.executeAndFormatResult(toolCall.toolId, toolCall.args, {
+          confirmed,
+        });
+
+        Logger.info('AIService', `Tool execution end: "${toolCall.toolId}"`);
+
+        await this.session.appendMessage(userId, sessionId, 'user', prompt);
+        await this.session.appendMessage(userId, sessionId, 'assistant', toolResult.text);
+
+        return toolResult.text;
+      }
+
+      // 5. Intelligent Live Web Search Decision with 1 Retry Fallback
+      let webSearchContext = '';
+      if (this.search.shouldSearch(prompt)) {
+        Logger.info('AIService', 'Intent classification: Live Web Search Required');
+        let searchRes;
+        try {
+          searchRes = await this.search.search(prompt);
+        } catch (searchErr) {
+          Logger.warn('AIService', 'Primary web search failed. Retrying search once...', searchErr);
+          searchRes = await this.search.search(prompt);
+        }
+
+        Logger.info('AIService', `Search provider used: "${searchRes.provider}"`);
+        Logger.info('AIService', `Search execution: ${searchRes.results.length} results returned`);
+
+        webSearchContext = this.search.formatSearchResultsForPrompt(searchRes);
+      } else {
+        Logger.info('AIService', 'Intent classification: Conversational LLM Completion');
+      }
+
+      // 6. Automatic Memory Extraction
+      await this.extractor.analyzeAndSave(prompt);
+
+      // 7. Retrieve short-term dialogue history
+      const conversationContext = await this.session.getRecentHistorySummary(userId, sessionId);
+
+      // 8. Append user message to session
+      await this.session.appendMessage(userId, sessionId, 'user', prompt);
+
+      // 9. Retrieve relevant long-term memories
+      const relevantMemories = await this.memory.getRelevantMemories(prompt);
       Logger.info(
         'AIService',
-        `Tool execution start: "${toolCall.toolId}" with parameters ${JSON.stringify(toolCall.args)}`,
+        `Memory lookup: ${relevantMemories.length} relevant memories retrieved`,
       );
 
-      const toolResult = await this.tools.executeAndFormatResult(toolCall.toolId, toolCall.args, {
-        confirmed,
+      let contextSummary = '';
+      if (relevantMemories.length > 0) {
+        contextSummary = relevantMemories
+          .map((m) => `- ${m.category} | ${m.key}: ${m.value}`)
+          .join('\n');
+      }
+
+      // 10. System prompt assembly
+      const systemPrompt = await this.personality.getSystemPrompt({
+        userId,
+        contextSummary,
+        conversationContext,
+        webSearchContext,
       });
 
-      Logger.info('AIService', `Tool execution end: "${toolCall.toolId}"`);
+      Logger.info(
+        'AIService',
+        `AI request sent to LLM provider:\n--- System Prompt ---\n${systemPrompt}\n--- User Prompt ---\n${prompt}`,
+      );
 
+      // 11. Provider Completion Execution with 1 Retry Fallback
+      const provider = AIFactory.getProvider();
+      let responseText = '';
+      try {
+        responseText = await provider.generateResponse(prompt, systemPrompt);
+      } catch (providerErr) {
+        Logger.warn(
+          'AIService',
+          'Primary LLM provider call failed. Retrying provider completion once...',
+          providerErr,
+        );
+        responseText = await provider.generateResponse(prompt, systemPrompt);
+      }
+
+      Logger.info('AIService', `AI response received: "${responseText}"`);
+
+      // 12. Append assistant response to short-term session history
+      await this.session.appendMessage(userId, sessionId, 'assistant', responseText);
+
+      return responseText;
+    } catch (err: unknown) {
+      Logger.error('AIService', 'Unhandled exception in generateResponse pipeline', err);
+      const fallbackMsg = "I couldn't get that right now, but I'm ready for your next question.";
       await this.session.appendMessage(userId, sessionId, 'user', prompt);
-      await this.session.appendMessage(userId, sessionId, 'assistant', toolResult.text);
-
-      return toolResult.text;
+      await this.session.appendMessage(userId, sessionId, 'assistant', fallbackMsg);
+      return fallbackMsg;
     }
-
-    // 4. Intelligent Live Web Search Decision
-    let webSearchContext = '';
-    if (this.search.shouldSearch(prompt)) {
-      Logger.info('AIService', 'Intent classification: Live Web Search Required');
-      const searchRes = await this.search.search(prompt);
-
-      Logger.info('AIService', `Search provider used: "${searchRes.provider}"`);
-      Logger.info('AIService', `Number of search results: ${searchRes.results.length}`);
-
-      webSearchContext = this.search.formatSearchResultsForPrompt(searchRes);
-    } else {
-      Logger.info('AIService', 'Intent classification: Conversational LLM Completion');
-    }
-
-    // 5. Automatic Memory Learning: Extract and save any long-term personal facts
-    await this.extractor.analyzeAndSave(prompt);
-
-    // 6. Retrieve recent short-term conversation context
-    const conversationContext = await this.session.getRecentHistorySummary(userId, sessionId);
-
-    // 7. Append current user message to session history
-    await this.session.appendMessage(userId, sessionId, 'user', prompt);
-
-    // 8. Retrieve relevant long-term memories
-    const relevantMemories = await this.memory.getRelevantMemories(prompt);
-
-    let contextSummary = '';
-    if (relevantMemories.length > 0) {
-      contextSummary = relevantMemories
-        .map((m) => `- ${m.category} | ${m.key}: ${m.value} (Confidence: ${m.confidence})`)
-        .join('\n');
-    }
-
-    // 9. Build clean, unified system prompt via PersonalityService
-    const systemPrompt = await this.personality.getSystemPrompt({
-      userId,
-      contextSummary,
-      conversationContext,
-      webSearchContext,
-    });
-
-    // 10. Log Final Prompt sent to LLM
-    Logger.info(
-      'AIService',
-      `Final prompt sent to the LLM:\n--- System Prompt ---\n${systemPrompt}\n--- User Prompt ---\n${prompt}`,
-    );
-
-    // 11. Delegate completion to active LLM provider
-    const provider = AIFactory.getProvider();
-    const responseText = await provider.generateResponse(prompt, systemPrompt);
-
-    // 12. Append assistant response to short-term session history
-    await this.session.appendMessage(userId, sessionId, 'assistant', responseText);
-
-    return responseText;
   }
 }
 
