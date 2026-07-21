@@ -179,6 +179,67 @@ const existingUtterances = [
   "for {prompt}"
 ];
 
+// Personal Knowledge & Life Memory Carriers (ASK-compliant)
+const personalMemoryCarriers = [
+  // Identity & Names
+  "my name is", "people call me", "i prefer to be called", "my nickname is",
+  "my birthday is", "my age is", "my gender is", "my nationality is",
+
+  // Family & Relationships
+  "i have a", "my father", "my mother", "my brother", "my sister",
+  "my wife", "my husband", "my son", "my daughter", "my cousin", "my family",
+
+  // Home & Living
+  "i live in", "i live at", "i moved to", "my address is", "my apartment is",
+  "my house is", "my room is",
+
+  // Education & School
+  "i study", "i'm studying", "i graduated from", "my university is",
+  "my school is", "my department is", "my major is", "my semester is", "my class is",
+
+  // Work & Career
+  "i work at", "i work as", "i got promoted to", "i changed jobs to",
+  "my office is in", "my boss is", "my company is",
+
+  // Devices & Hardware
+  "i bought a new", "i purchased a new", "i got a new", "i own a", "i use a",
+  "my laptop is", "my computer is", "my pc is", "my desktop is", "my monitor is",
+  "my keyboard is", "my mouse is", "my headphones are", "my phone is", "my iphone is",
+  "my android is", "my smartwatch is", "my tablet is",
+
+  // Technology & Systems
+  "i use windows", "i use linux", "i use macos", "i switched to", "i upgraded to",
+  "i downgraded to",
+
+  // Vehicles & Transport
+  "my car is", "my bike is", "my motorcycle is", "my bicycle is",
+
+  // Finance & Subscriptions
+  "my bank is", "my account is", "my subscription is", "i subscribed to", "i cancelled my",
+
+  // Health & Preferences
+  "i prefer", "i don't like", "i avoid", "i am allergic to", "i wear",
+
+  // Food & Drink
+  "my favorite food is", "i like eating", "i don't like eating", "i hate", "i love",
+
+  // Entertainment & Sports
+  "my favorite movie is", "my favorite game is", "my favorite football club is",
+  "my favorite team is", "my favorite player is",
+
+  // Travel & Visas
+  "i visited", "i traveled to", "i'm going to", "my passport expires in", "my visa expires in",
+
+  // Goals & Learning
+  "i want to", "my goal is to", "i'm trying to", "i'm learning", "my project is", "my startup is",
+
+  // Habits & Routine
+  "every morning i", "every night i", "usually i", "always i", "never i",
+
+  // Ownership & Purchases
+  "i bought", "i sold", "i upgraded", "i replaced", "i lost my", "i found my"
+];
+
 // Conversational Suffixes
 const suffixes = [
   "please", "durjoy", "today", "tomorrow", "now", "right now",
@@ -260,7 +321,22 @@ questionCarriers.forEach(q => {
   }
 });
 
-// 3. Add Conversational utterances to ConversationalIntent
+// 3. Add Personal Memory Carriers to ConversationalIntent
+personalMemoryCarriers.forEach(pm => {
+  const norm = `${pm} {prompt}`;
+  if (!globalSet.has(norm)) {
+    convSet.add(norm);
+    globalSet.add(norm);
+  }
+
+  const normDurjoy = `durjoy ${pm} {prompt}`;
+  if (!globalSet.has(normDurjoy)) {
+    convSet.add(normDurjoy);
+    globalSet.add(normDurjoy);
+  }
+});
+
+// 4. Add Conversational utterances to ConversationalIntent
 bdEnglishCarriers.forEach(b => {
   const norm = `${b}`;
   if (!globalSet.has(norm)) {
@@ -301,7 +377,7 @@ casualStarts.forEach(c => {
   });
 });
 
-// 4. Add GeneralQuery utterances to GeneralQueryIntent
+// 5. Add GeneralQuery utterances to GeneralQueryIntent
 const generalQueryStarts = [
   "tell me", "explain to me", "describe to me", "give details about",
   "search the web for", "search google for", "look up info on", "find details on",
@@ -335,6 +411,7 @@ console.log(`ChatIntent: ${chatList.length} utterances.`);
 console.log(`ConversationalIntent: ${convList.length} utterances.`);
 console.log(`GeneralQueryIntent: ${genList.length} utterances.`);
 console.log(`Global Unique Utterances: ${globalSet.size}`);
+console.log(`Personal Memory Carriers added: ${personalMemoryCarriers.length * 2}`);
 
 const resultJson = {
   interactionModel: {
