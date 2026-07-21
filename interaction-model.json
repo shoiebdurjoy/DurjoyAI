@@ -12,7 +12,6 @@
             }
           ],
           "samples": [
-            "{prompt}",
             "ask {prompt}",
             "ask durjoy {prompt}",
             "tell me {prompt}",
@@ -40,7 +39,11 @@
             "check {prompt}",
             "get {prompt}",
             "remember {prompt}",
-            "remind me {prompt}"
+            "remind me {prompt}",
+            "{prompt} please",
+            "{prompt} durjoy",
+            "about {prompt}",
+            "for {prompt}"
           ]
         },
         {
