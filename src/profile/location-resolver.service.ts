@@ -90,11 +90,10 @@ export class LocationResolverService {
       return expanded;
     }
 
-    // 3. Weather & Rain queries for Home / Default (e.g. "Will it rain today?", "How's the weather?")
+    // 3. Weather & Rain queries for Home / Default (e.g. "Will it rain today?", "What's the weather today?", "How's the weather?")
     if (
-      /\b(will it rain|is it going to rain|rain today|weather today|how's the weather|weather near home|weather outside)\b/i.test(
-        text,
-      )
+      /\b(weather|rain|rainy|temperature|forecast|climate)\b/i.test(text) &&
+      !/\b(london|tokyo|paris|new york|chicago|sydney|madrid|berlin|rome)\b/i.test(text)
     ) {
       const expanded = `weather today ${homeArea} ${homeCity} ${homeCountry}`;
       Logger.info('LocationResolver', `Expanded query: "${prompt}" -> "${expanded}"`);

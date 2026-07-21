@@ -108,6 +108,21 @@ export class MemoryExtractorService {
 
     const text = prompt.trim();
 
+    // 0. Short color update (e.g. "its blue", "it's blue", "it's green", "actually it's red", "blue")
+    const colorMatch = text.match(
+      /^(actually |it'?s |it is )*(blue|green|red|yellow|black|white|purple|pink|orange|brown)[.!]*$/i,
+    );
+    if (colorMatch) {
+      const colorVal = colorMatch[2].toLowerCase();
+      return {
+        shouldRemember: true,
+        category: 'Preference',
+        key: 'Favorite Color',
+        value: colorVal,
+        importance: 8,
+      };
+    }
+
     // Ignore greetings, weather, small talk, jokes, lunch, thanks, insults, uncertainty
     if (!this.memoryService.shouldRemember(text)) {
       return { shouldRemember: false };

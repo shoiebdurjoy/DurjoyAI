@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ISearchProvider, SearchResponse, SearchItem } from '../search.interface';
 import { Logger } from '../../utils/logger';
 

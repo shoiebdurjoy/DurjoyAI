@@ -79,6 +79,69 @@ export class SQLiteMemoryRepository implements IPersistentMemoryRepository {
       CREATE INDEX IF NOT EXISTS idx_mem_importance ON persistent_memories(importance);
       CREATE INDEX IF NOT EXISTS idx_mem_last_accessed ON persistent_memories(last_accessed);
     `);
+
+    // 4. Pre-populate default owner facts if database table is empty
+    try {
+      const countStmt = this.db.prepare('SELECT COUNT(*) as cnt FROM persistent_memories');
+      const countRow = countStmt.get() as { cnt: number };
+      if (countRow && countRow.cnt === 0) {
+        const now = new Date().toISOString();
+        const insertStmt = this.db.prepare(`
+          INSERT INTO persistent_memories (id, category, key, value, importance, confidence, access_count, last_accessed, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertStmt.run(
+          'mem_def_color',
+          'Preference',
+          'Favorite Color',
+          'blue',
+          8,
+          100.0,
+          1,
+          now,
+          now,
+          now,
+        );
+        insertStmt.run(
+          'mem_def_uni',
+          'Education',
+          'University',
+          'BRAC University',
+          9,
+          100.0,
+          1,
+          now,
+          now,
+          now,
+        );
+        insertStmt.run(
+          'mem_def_res',
+          'Location',
+          'Residence',
+          'Uttara, Dhaka, Bangladesh',
+          9,
+          100.0,
+          1,
+          now,
+          now,
+          now,
+        );
+        insertStmt.run(
+          'mem_def_office',
+          'Career',
+          'Office Location',
+          'Gulshan, Dhaka, Bangladesh',
+          8,
+          100.0,
+          1,
+          now,
+          now,
+          now,
+        );
+      }
+    } catch {
+      // Index / seed safe fallback
+    }
   }
 
   public async initialize(): Promise<void> {

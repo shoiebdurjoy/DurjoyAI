@@ -3,6 +3,8 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import { aiService } from './ai.service';
 import { persistentMemoryService } from '../memory/persistent-memory.service';
+import { memoryExtractorService } from '../memory/memory-extractor.service';
+import { locationResolverService } from '../profile/location-resolver.service';
 
 describe('Milestone 14.6 — Conversation Reliability & Smart Memory End-to-End Test Suite', () => {
   before(() => {
@@ -47,6 +49,23 @@ describe('Milestone 14.6 — Conversation Reliability & Smart Memory End-to-End 
         `Response for '${prompt}' must not contain unstripped memory tags`,
       );
     }
+  });
+
+  it('should parse short color updates like "its blue" or "it\'s green" and save to SQLite memory', async () => {
+    await memoryExtractorService.analyzeAndSave('its blue');
+    const mem = await persistentMemoryService.getMemoryByKey('Favorite Color', 'Preference');
+    assert.ok(mem, 'Memory for Favorite Color must exist after saying "its blue"');
+    assert.strictEqual(mem.value, 'blue');
+
+    await memoryExtractorService.analyzeAndSave("it's green");
+    const mem2 = await persistentMemoryService.getMemoryByKey('Favorite Color', 'Preference');
+    assert.strictEqual(mem2?.value, 'green');
+  });
+
+  it('should expand weather queries like "what\'s the weather today" to Uttara Dhaka Bangladesh', async () => {
+    const expanded = await locationResolverService.expandSearchQuery("what's the weather today");
+    assert.ok(expanded.includes('Uttara'), 'Expanded weather query must include Uttara');
+    assert.ok(expanded.includes('Dhaka'), 'Expanded weather query must include Dhaka');
   });
 
   it('should NOT save uncertain statements into memory', () => {

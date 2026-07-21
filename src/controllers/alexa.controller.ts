@@ -151,21 +151,16 @@ export class AlexaController {
         // We therefore prompt the user to rephrase so we can route to ChatIntent
         // which DOES carry the AMAZON.SearchQuery slot with the full free-form text.
 
-        if (intentName === 'AMAZON.FallbackIntent') {
-          const shouldEndSession = false;
-          const speech = "I didn't catch that clearly. Could you rephrase your question?";
-          Logger.warn(
-            'AlexaController',
-            `AMAZON.FallbackIntent triggered — no slot value available. Prompting user to rephrase. | SessionId: ${sessionId} | shouldEndSession: ${shouldEndSession}`,
-          );
-          res
-            .status(200)
-            .json(buildAlexaResponse(speech, shouldEndSession, 'What would you like to know?'));
-          return;
-        }
+        // Handle AMAZON.FallbackIntent and all custom intents seamlessly through AIService
+        let userPrompt = extractUserPrompt(alexaRequest);
 
-        // All remaining intents (ChatIntent and any future custom intents)
-        const userPrompt = extractUserPrompt(alexaRequest);
+        if (!userPrompt && intentName === 'AMAZON.FallbackIntent') {
+          Logger.info(
+            'AlexaController',
+            `AMAZON.FallbackIntent triggered without slot value — routing to AIService with default conversational prompt. | SessionId: ${sessionId}`,
+          );
+          userPrompt = 'hello';
+        }
 
         Logger.info(
           'AlexaController',
