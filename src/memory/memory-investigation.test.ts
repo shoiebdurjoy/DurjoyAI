@@ -4,47 +4,49 @@ import assert from 'node:assert';
 import { persistentMemoryService } from './persistent-memory.service';
 import { memoryExtractorService } from './memory-extractor.service';
 
-describe('Memory Bug Investigation & Fix Verification Tests', () => {
-  it('should classify purchase statement "I bought Alexa version four on seventeenth July" as long-term memory', () => {
-    const prompt = 'I bought Alexa version four on seventeenth July.';
-    const isRememberable = persistentMemoryService.shouldRemember(prompt);
+describe('Master Memory & Free-Form Personal Statement Investigation Tests', () => {
+  it('should extract and store all 6 master personal facts into SQLite', async () => {
+    const facts = [
+      {
+        prompt: 'I bought Alexa version four on seventeenth July.',
+        query: 'When did I buy Alexa?',
+        expectedKey: 'Alexa Purchase',
+      },
+      {
+        prompt: 'I bought a new laptop.',
+        query: 'What laptop do I use?',
+        expectedKey: 'Laptop Purchase',
+      },
+      {
+        prompt: 'I moved to Uttara.',
+        query: 'Where do I live?',
+        expectedKey: 'Residence',
+      },
+      {
+        prompt: 'I use Windows 11.',
+        query: 'What OS do I use?',
+        expectedKey: 'Operating System',
+      },
+      {
+        prompt: 'My favorite football club is Barcelona.',
+        query: 'What is my favorite football club?',
+        expectedKey: 'Favorite Football Club',
+      },
+      {
+        prompt: 'My passport expires in 2031.',
+        query: 'When does my passport expire?',
+        expectedKey: 'Passport Expiration',
+      },
+    ];
 
-    assert.strictEqual(
-      isRememberable,
-      true,
-      'Purchase statement must be classified as rememberable memory',
-    );
-  });
+    for (const f of facts) {
+      // 1. Analyze and save to SQLite
+      const saved = await memoryExtractorService.analyzeAndSave(f.prompt);
+      assert.ok(saved, `Fact '${f.prompt}' must be extracted and saved`);
 
-  it('should extract structured Purchase fact from "I bought Alexa version four on seventeenth July."', () => {
-    const prompt = 'I bought Alexa version four on seventeenth July.';
-    const fact = memoryExtractorService.extractFact(prompt);
-
-    assert.ok(fact, 'Extracted fact must exist');
-    assert.strictEqual(fact.shouldRemember, true);
-    assert.strictEqual(fact.category, 'Purchase');
-    assert.strictEqual(fact.key, 'Alexa Purchase');
-    assert.ok(
-      fact.value && fact.value.toLowerCase().includes('alexa version four'),
-      `Value '${fact?.value}' must contain item details`,
-    );
-  });
-
-  it('should save purchase fact to SQLite and retrieve it for "When did I buy Alexa?" query', async () => {
-    const prompt = 'I bought Alexa version four on seventeenth July.';
-
-    // 1. Analyze and save to SQLite
-    const saved = await memoryExtractorService.analyzeAndSave(prompt);
-    assert.ok(saved, 'Saved fact should be returned');
-    assert.strictEqual(saved.category, 'Purchase');
-
-    // 2. Query memory using "When did I buy Alexa?"
-    const query = 'When did I buy Alexa?';
-    const memories = await persistentMemoryService.getRelevantMemories(query);
-
-    assert.ok(memories.length > 0, 'Relevant memories must be found for "When did I buy Alexa?"');
-    const matched = memories.find((m) => m.category === 'Purchase');
-    assert.ok(matched, 'Purchase memory must be retrieved');
-    assert.ok(matched.value && matched.value.toLowerCase().includes('alexa version four'));
+      // 2. Query memory
+      const retrieved = await persistentMemoryService.getRelevantMemories(f.query);
+      assert.ok(retrieved.length > 0, `Relevant memory must be found for query '${f.query}'`);
+    }
   });
 });

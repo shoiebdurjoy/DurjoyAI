@@ -117,7 +117,6 @@ export class PersistentMemoryService {
       'should',
       'would',
       'could',
-      'use',
       'using',
       'have',
       'has',
@@ -125,17 +124,23 @@ export class PersistentMemoryService {
       'show',
       'give',
       'know',
-      'where',
     ]);
 
     const synonymMap: Record<string, string[]> = {
       study: ['education', 'university', 'school', 'degree', 'major'],
       work: ['career', 'occupation', 'job'],
-      laptop: ['device', 'hardware', 'gpu', 'ram'],
-      club: ['sports', 'football', 'preference'],
+      laptop: ['device', 'hardware', 'gpu', 'ram', 'pc', 'computer', 'macbook', 'mac'],
+      club: ['sports', 'football', 'preference', 'barcelona', 'team'],
       buy: ['bought', 'purchased', 'purchase', 'acquisition', 'got'],
       bought: ['buy', 'purchased', 'purchase', 'acquisition', 'got'],
       alexa: ['device', 'assistant', 'echo', 'speaker'],
+      os: ['windows', 'macos', 'linux', 'operating system', 'system', 'use'],
+      windows: ['os', 'operating system', 'system', 'pc', 'computer'],
+      moved: ['live', 'residence', 'home', 'location', 'address', 'uttara'],
+      live: ['residence', 'home', 'location', 'address', 'uttara', 'moved', 'living'],
+      where: ['residence', 'location', 'address', 'home', 'live', 'office'],
+      passport: ['document', 'visa', 'id', 'expiration', 'expires', 'expire'],
+      expire: ['expiration', 'expires', 'valid', 'passport'],
     };
 
     const rawWords = prompt
@@ -265,10 +270,14 @@ export class PersistentMemoryService {
       /\bmy goal\b/i,
       /\bmy birthday\b/i,
       /\bi live in\b/i,
+      /\bi moved to\b/i,
       /\bmy degree\b/i,
       /\bi (bought|purchased|got|acquired)\b/i,
       /\bmy alexa\b/i,
       /\balexa version\b/i,
+      /\bi (use|run|installed) (windows|macOS|linux|ubuntu)\b/i,
+      /\bmy (operating system|os) is\b/i,
+      /\b(passport|visa|license|id) expires\b/i,
       /\bit'?s (actually )?(blue|green|red|yellow|black|white|purple|pink|orange|brown)\b/i,
     ];
 

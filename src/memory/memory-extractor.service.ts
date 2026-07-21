@@ -260,14 +260,47 @@ export class MemoryExtractorService {
       };
     }
 
-    // 9. Residence (Location)
-    const liveMatch = text.match(/i live in (.+)/i) || text.match(/my home is in (.+)/i);
+    // 9. Residence & Relocation (Location)
+    const liveMatch =
+      text.match(/i live in (.+)/i) ||
+      text.match(/my home is in (.+)/i) ||
+      text.match(/i (moved|relocated) to (.+)/i);
     if (liveMatch) {
+      const val = liveMatch[2] || liveMatch[1];
       return {
         shouldRemember: true,
         category: 'Location',
         key: 'Residence',
-        value: liveMatch[1].replace(/[.!]$/, '').trim(),
+        value: val.replace(/[.!]$/, '').trim(),
+        importance: 9,
+      };
+    }
+
+    // 10. Operating System / Software (Device)
+    const osMatch =
+      text.match(/i (use|run|installed) (windows \d*|macOS \w*|linux|ubuntu|android|iOS)/i) ||
+      text.match(/my (operating system|os) is (.+)/i);
+    if (osMatch) {
+      const val = osMatch[2] || osMatch[1];
+      return {
+        shouldRemember: true,
+        category: 'Device',
+        key: 'Operating System',
+        value: val.replace(/[.!]$/, '').trim(),
+        importance: 8,
+      };
+    }
+
+    // 11. Document Expiration / Passport (Personal)
+    const expireMatch = text.match(/my (passport|visa|license|id) expires (in|on) (.+)/i);
+    if (expireMatch) {
+      const doc = expireMatch[1].toLowerCase();
+      const capDoc = doc.charAt(0).toUpperCase() + doc.slice(1);
+      return {
+        shouldRemember: true,
+        category: 'Personal',
+        key: `${capDoc} Expiration`,
+        value: expireMatch[3].replace(/[.!]$/, '').trim(),
         importance: 9,
       };
     }
