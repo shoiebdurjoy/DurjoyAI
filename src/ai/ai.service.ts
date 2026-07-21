@@ -179,15 +179,22 @@ export class AIService {
         responseText = await provider.generateResponse(prompt, systemPrompt);
       }
 
-      Logger.info('AIService', `AI response received: "${responseText}"`);
+      // Process any embedded memory action tags in LLM response
+      const cleanSpeech = await this.extractor.processMemoryActionTags(responseText);
+      const finalResponseText =
+        cleanSpeech && cleanSpeech.trim().length > 0
+          ? cleanSpeech.trim()
+          : "I'm right here. How can I help you next?";
+
+      Logger.info('AIService', `AI response received: "${finalResponseText}"`);
 
       // 12. Append assistant response to short-term session history
-      await this.session.appendMessage(userId, sessionId, 'assistant', responseText);
+      await this.session.appendMessage(userId, sessionId, 'assistant', finalResponseText);
 
-      return responseText;
+      return finalResponseText;
     } catch (err: unknown) {
       Logger.error('AIService', 'Unhandled exception in generateResponse pipeline', err);
-      const fallbackMsg = "I couldn't get that right now, but I'm ready for your next question.";
+      const fallbackMsg = "I'm right here. What would you like to ask Durjoy AI?";
       await this.session.appendMessage(userId, sessionId, 'user', prompt);
       await this.session.appendMessage(userId, sessionId, 'assistant', fallbackMsg);
       return fallbackMsg;

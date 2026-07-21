@@ -1,5 +1,6 @@
 import { persistentMemoryService, PersistentMemoryService } from './persistent-memory.service';
 import { MemoryRecord, MemoryCategory } from './memory.interface';
+import { Logger } from '../utils/logger';
 
 export interface ExtractedFact {
   shouldRemember: boolean;
@@ -13,6 +14,39 @@ export interface ExtractedFact {
 
 export class MemoryExtractorService {
   constructor(private readonly memoryService: PersistentMemoryService = persistentMemoryService) {}
+
+  /**
+   * Processes an AI response text to find any embedded [MEMORY_ACTION: Category|Key|Value] tags,
+   * performs the upsert memory action in SQLite, and returns the clean speech text with tags removed.
+   *
+   * @param aiResponse Raw AI response text from LLM provider
+   * @returns Clean speech text ready for voice output
+   */
+  public async processMemoryActionTags(aiResponse: string): Promise<string> {
+    if (!aiResponse || aiResponse.trim().length === 0) {
+      return aiResponse;
+    }
+
+    const tagRegex = /\[MEMORY_ACTION:\s*([^|]+)\|([^|]+)\|([^\]]+)\]/gi;
+    let cleanText = aiResponse;
+    let match;
+
+    while ((match = tagRegex.exec(aiResponse)) !== null) {
+      const category = match[1].trim();
+      const key = match[2].trim();
+      const value = match[3].trim();
+
+      Logger.info(
+        'MemoryExtractorService',
+        `Upserting memory record from LLM tag | Category: "${category}" | Key: "${key}" | Value: "${value}"`,
+      );
+
+      await this.memoryService.saveMemory(category, key, value, 8);
+    }
+
+    cleanText = cleanText.replace(tagRegex, '').trim();
+    return cleanText;
+  }
 
   /**
    * Analyzes a user message to extract permanent long-term personal facts,
@@ -33,6 +67,11 @@ export class MemoryExtractorService {
       return null;
     }
 
+    Logger.info(
+      'MemoryExtractorService',
+      `Auto-extracted fact | Category: "${extracted.category}" | Key: "${extracted.key}" | Value: "${extracted.value}"`,
+    );
+
     return this.memoryService.saveMemory(
       extracted.category,
       extracted.key,
@@ -52,15 +91,15 @@ export class MemoryExtractorService {
    */
   public extractFact(prompt: string): ExtractedFact | null {
     if (!prompt || prompt.trim().length === 0) {
-      return null;
-    }
-
-    // Ignore greetings, weather, small talk, jokes, lunch
-    if (!this.memoryService.shouldRemember(prompt)) {
       return { shouldRemember: false };
     }
 
     const text = prompt.trim();
+
+    // Ignore greetings, weather, small talk, jokes, lunch, thanks, insults
+    if (!this.memoryService.shouldRemember(text)) {
+      return { shouldRemember: false };
+    }
 
     // 1. Favorite Club / Sport Team (Preference)
     const favClubMatch =
@@ -117,7 +156,18 @@ export class MemoryExtractorService {
       };
     }
 
-    // 5. Work / Career (Career)
+    // 5. Work / Career / Office (Career / Location)
+    const officeMatch = text.match(/my office is in (.+)/i) || text.match(/i work at (.+)/i);
+    if (officeMatch) {
+      return {
+        shouldRemember: true,
+        category: 'Career',
+        key: 'Office Location',
+        value: officeMatch[1].replace(/[.!]$/, '').trim(),
+        importance: 8,
+      };
+    }
+
     const workMatch = text.match(/i work as (an? )?(.+)/i) || text.match(/my job is (an? )?(.+)/i);
     if (workMatch) {
       return {
@@ -129,7 +179,19 @@ export class MemoryExtractorService {
       };
     }
 
-    // 6. Generic Favorite (Preference)
+    // 6. Food & Personal Preferences
+    const foodHateMatch = text.match(/i (hate|dislike|don't like) (.+)/i);
+    if (foodHateMatch) {
+      return {
+        shouldRemember: true,
+        category: 'Preference',
+        key: `Dislike ${foodHateMatch[2].trim()}`,
+        value: `Dislikes ${foodHateMatch[2].replace(/[.!]$/, '').trim()}`,
+        importance: 7,
+      };
+    }
+
+    // 7. Generic Favorite (Preference)
     const genFavMatch = text.match(/my favorite ([a-z\s]+) is (.+)/i);
     if (genFavMatch) {
       const key = genFavMatch[1].trim().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -142,7 +204,7 @@ export class MemoryExtractorService {
       };
     }
 
-    // 7. Name (Personal)
+    // 8. Name (Personal)
     const nameMatch = text.match(/my name is (.+)/i);
     if (nameMatch) {
       return {
@@ -151,6 +213,18 @@ export class MemoryExtractorService {
         key: 'Name',
         value: nameMatch[1].replace(/[.!]$/, '').trim(),
         importance: 10,
+      };
+    }
+
+    // 9. Residence (Location)
+    const liveMatch = text.match(/i live in (.+)/i) || text.match(/my home is in (.+)/i);
+    if (liveMatch) {
+      return {
+        shouldRemember: true,
+        category: 'Location',
+        key: 'Residence',
+        value: liveMatch[1].replace(/[.!]$/, '').trim(),
+        importance: 9,
       };
     }
 
