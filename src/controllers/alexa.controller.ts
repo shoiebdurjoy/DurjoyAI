@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { buildAlexaResponse, buildAlexaEmptyResponse } from '../utils/alexa-response';
 import { aiService } from '../ai/ai.service';
 import { Logger } from '../utils/logger';
+import { isExitIntent, getRandomExitMessage } from '../utils/exit-detector';
+import { getRandomReprompt } from '../utils/reprompt-rotator';
 
 /**
  * Extracts user speech text from an Alexa IntentRequest.
@@ -48,55 +50,50 @@ export class AlexaController {
    * Single entry point for ALL Alexa webhook requests.
    *
    * Pipeline:
-   *   Alexa → POST /alexa → alexaVerificationMiddleware → handleWebhook
-   *        → AIService → (Memory | Tools | Search | LLM) → Alexa Response
-   *
-   * Every stage is logged:
-   *   - Request type
-   *   - Intent name
-   *   - Extracted prompt
-   *   - Session ID
-   *   - shouldEndSession (on every outbound response)
+   *  1. Inspect request type (LaunchRequest, IntentRequest, SessionEndedRequest)
+   *  2. Handle SessionEndedRequest with an empty ASK-compliant response.
+   *  3. Handle LaunchRequest with fast 3-word speech ("Durjoy AI ready.") and keep session alive.
+   *  4. Extract prompt from IntentRequest.
+   *  5. Handle natural exit phrases (bye, see you, talk later) with friendly goodbye and shouldEndSession = true.
+   *  6. Forward prompt to AIService pipeline (Normalization -> Reasoning -> Tools -> Search -> Memory -> LLM).
+   *  7. Return ASK-compliant JSON with outputSpeech, reprompt, and shouldEndSession = false.
    */
   public handleWebhook = async (req: Request, res: Response): Promise<void> => {
     try {
       const alexaRequest = req.body;
-
-      if (!alexaRequest || !alexaRequest.request) {
-        Logger.warn('AlexaController', 'Malformed request — missing Alexa request body.');
-        res.status(400).json({ status: 'error', message: 'Missing Alexa request body.' });
-        return;
-      }
-
-      const requestType: string = alexaRequest.request.type;
-      const requestId: string = alexaRequest.request.requestId || 'N/A';
-      const sessionId: string = alexaRequest.session?.sessionId || 'N/A';
-      const userId: string = alexaRequest.session?.user?.userId || 'alexa-user';
+      const requestType: string = alexaRequest?.request?.type;
+      const sessionId: string = alexaRequest?.session?.sessionId || 'unknown-session';
+      const userId: string = alexaRequest?.session?.user?.userId || 'alexa-user';
 
       Logger.info(
         'AlexaController',
-        `━━━ ALEXA REQUEST ━━━ | Type: ${requestType} | Intent: ${alexaRequest.request.intent?.name || 'N/A'} | SessionId: ${sessionId} | RequestId: ${requestId}`,
+        `Request received | Type: ${requestType} | SessionId: ${sessionId} | UserId: ${userId}`,
       );
-
-      // ─── LaunchRequest ────────────────────────────────────────────────────
-      if (requestType === 'LaunchRequest') {
-        const shouldEndSession = false;
-        const speech = 'Durjoy AI ready.';
-        const reprompt = 'How can I help?';
-
-        Logger.info(
-          'AlexaController',
-          `RESPONSE | LaunchRequest | Speech: "${speech}" | shouldEndSession: ${shouldEndSession}`,
-        );
-        res.status(200).json(buildAlexaResponse(speech, shouldEndSession, reprompt));
-        return;
-      }
 
       // ─── SessionEndedRequest ──────────────────────────────────────────────
       if (requestType === 'SessionEndedRequest') {
-        const reason = alexaRequest.request.reason || 'UNKNOWN';
-        Logger.info('AlexaController', `Session ended. Reason: ${reason}`);
+        const reason = alexaRequest?.request?.reason;
+        const errDetails = alexaRequest?.request?.error;
+        Logger.info(
+          'AlexaController',
+          `SessionEndedRequest received | Reason: ${reason} | Error: ${JSON.stringify(errDetails || {})}`,
+        );
         res.status(200).json(buildAlexaEmptyResponse());
+        return;
+      }
+
+      // ─── LaunchRequest ───────────────────────────────────────────────────
+      if (requestType === 'LaunchRequest') {
+        const launchSpeech = 'Durjoy AI ready.';
+        const repromptText = getRandomReprompt();
+        const shouldEndSession = false;
+
+        Logger.info(
+          'AlexaController',
+          `RESPONSE | LaunchRequest | Speech: "${launchSpeech}" | Reprompt: "${repromptText}" | shouldEndSession: ${shouldEndSession}`,
+        );
+
+        res.status(200).json(buildAlexaResponse(launchSpeech, shouldEndSession, repromptText));
         return;
       }
 
@@ -106,14 +103,15 @@ export class AlexaController {
 
         Logger.info('AlexaController', `INTENT | Name: ${intentName} | SessionId: ${sessionId}`);
 
-        // Built-in: Stop / Cancel — end session
+        // Built-in: Stop / Cancel — end session gracefully
         if (intentName === 'AMAZON.StopIntent' || intentName === 'AMAZON.CancelIntent') {
+          const exitMsg = getRandomExitMessage();
           const shouldEndSession = true;
           Logger.info(
             'AlexaController',
-            `RESPONSE | ${intentName} | Speech: "Goodbye!" | shouldEndSession: ${shouldEndSession}`,
+            `RESPONSE | ${intentName} | Speech: "${exitMsg}" | shouldEndSession: ${shouldEndSession}`,
           );
-          res.status(200).json(buildAlexaResponse('Goodbye!', shouldEndSession));
+          res.status(200).json(buildAlexaResponse(exitMsg, shouldEndSession));
           return;
         }
 
@@ -121,37 +119,30 @@ export class AlexaController {
         if (intentName === 'AMAZON.HelpIntent') {
           const shouldEndSession = false;
           const speech = 'Ask me anything — latest news, weather, scores, or reminders!';
+          const repromptText = getRandomReprompt();
           Logger.info(
             'AlexaController',
             `RESPONSE | AMAZON.HelpIntent | Speech: "${speech}" | shouldEndSession: ${shouldEndSession}`,
           );
-          res
-            .status(200)
-            .json(buildAlexaResponse(speech, shouldEndSession, 'What would you like to ask?'));
+          res.status(200).json(buildAlexaResponse(speech, shouldEndSession, repromptText));
           return;
         }
 
         // Built-in: NavigateHome — re-open
         if (intentName === 'AMAZON.NavigateHomeIntent') {
           const shouldEndSession = false;
+          const repromptText = getRandomReprompt();
           Logger.info(
             'AlexaController',
             `RESPONSE | AMAZON.NavigateHomeIntent | shouldEndSession: ${shouldEndSession}`,
           );
           res
             .status(200)
-            .json(buildAlexaResponse('Durjoy AI ready.', shouldEndSession, 'How can I help?'));
+            .json(buildAlexaResponse('Durjoy AI ready.', shouldEndSession, repromptText));
           return;
         }
 
         // ── ChatIntent / AMAZON.FallbackIntent / any other custom intent ────
-        //
-        // AMAZON.FallbackIntent arrives when the user says something Alexa cannot
-        // map to any explicit utterance. There are NO slots on FallbackIntent.
-        // We therefore prompt the user to rephrase so we can route to ChatIntent
-        // which DOES carry the AMAZON.SearchQuery slot with the full free-form text.
-
-        // Handle AMAZON.FallbackIntent and all custom intents seamlessly through AIService
         let userPrompt = extractUserPrompt(alexaRequest);
 
         if (!userPrompt && intentName === 'AMAZON.FallbackIntent') {
@@ -170,37 +161,44 @@ export class AlexaController {
         if (!userPrompt) {
           const shouldEndSession = false;
           const speech = 'What would you like to know?';
+          const repromptText = getRandomReprompt();
           Logger.warn(
             'AlexaController',
             `Empty prompt slot for intent "${intentName}". | shouldEndSession: ${shouldEndSession}`,
           );
-          res.status(200).json(buildAlexaResponse(speech, shouldEndSession, speech));
+          res.status(200).json(buildAlexaResponse(speech, shouldEndSession, repromptText));
+          return;
+        }
+
+        // Check for natural exit phrases (bye, see you, talk later, good night)
+        if (isExitIntent(userPrompt)) {
+          const exitMsg = getRandomExitMessage();
+          Logger.info(
+            'AlexaController',
+            `RESPONSE | Exit Intent Detected | Speech: "${exitMsg}" | shouldEndSession: true`,
+          );
+          res.status(200).json(buildAlexaResponse(exitMsg, true));
           return;
         }
 
         // ── Invoke full AIService pipeline ───────────────────────────────────
-        //    Alexa → /alexa → AlexaController → AIService
-        //         → (Normalization → Reasoning → Tools → Search → Memory → LLM)
         try {
           const aiResponse = await aiService.generateResponse(userPrompt, { userId, sessionId });
 
           const speechOutput =
             !aiResponse || aiResponse.trim().length === 0
-              ? 'What else can I help you with?'
+              ? 'I am right here. How can I help next?'
               : aiResponse;
 
           const shouldEndSession = false;
+          const repromptText = getRandomReprompt();
 
           Logger.info(
             'AlexaController',
-            `RESPONSE | Intent: ${intentName} | Prompt: "${userPrompt}" | Speech: "${speechOutput}" | shouldEndSession: ${shouldEndSession}`,
+            `RESPONSE | Intent: ${intentName} | Prompt: "${userPrompt}" | Speech: "${speechOutput}" | Reprompt: "${repromptText}" | shouldEndSession: ${shouldEndSession}`,
           );
 
-          res
-            .status(200)
-            .json(
-              buildAlexaResponse(speechOutput, shouldEndSession, 'What else can I help you with?'),
-            );
+          res.status(200).json(buildAlexaResponse(speechOutput, shouldEndSession, repromptText));
         } catch (aiError) {
           Logger.error(
             'AlexaController',
@@ -208,14 +206,13 @@ export class AlexaController {
             aiError,
           );
           const shouldEndSession = false;
-          const fallback = "I couldn't get that. Please try asking again.";
+          const fallback = "I'm right here. What would you like to ask Durjoy AI?";
+          const repromptText = getRandomReprompt();
           Logger.info(
             'AlexaController',
             `RESPONSE | FALLBACK | Speech: "${fallback}" | shouldEndSession: ${shouldEndSession}`,
           );
-          res
-            .status(200)
-            .json(buildAlexaResponse(fallback, shouldEndSession, 'Please try asking again.'));
+          res.status(200).json(buildAlexaResponse(fallback, shouldEndSession, repromptText));
         }
         return;
       }
@@ -225,7 +222,7 @@ export class AlexaController {
         'AlexaController',
         `Unknown request type: "${requestType}". Returning ready state.`,
       );
-      res.status(200).json(buildAlexaResponse('Durjoy AI ready.', false, 'How can I help?'));
+      res.status(200).json(buildAlexaResponse('Durjoy AI ready.', false, getRandomReprompt()));
     } catch (error) {
       Logger.error('AlexaController', 'Unhandled exception in Alexa webhook handler', error);
       res
@@ -234,7 +231,7 @@ export class AlexaController {
           buildAlexaResponse(
             'Durjoy AI is having a moment. Please try again.',
             false,
-            'Try again?',
+            getRandomReprompt(),
           ),
         );
     }
