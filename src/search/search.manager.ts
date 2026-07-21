@@ -1,5 +1,6 @@
 import { ISearchProvider, SearchResponse, SearchItem, SearchLog } from './search.interface';
 import { SearchFactory } from './search.factory';
+import { SportsSearchProvider } from './providers/sports.provider';
 import { Logger } from '../utils/logger';
 
 export interface CacheEntry {
@@ -11,11 +12,27 @@ export class SearchManager {
   private cache: Map<string, CacheEntry> = new Map();
   private logs: SearchLog[] = [];
   private readonly cacheTtlMs = 15 * 60 * 1000; // 15 minutes
+  private readonly sportsProvider = new SportsSearchProvider();
 
   constructor(private provider?: ISearchProvider) {}
 
   private getActiveProvider(): ISearchProvider {
     return this.provider || SearchFactory.getProvider();
+  }
+
+  /**
+   * Detects whether a query is asking about sports scores, live matches, or fixtures.
+   *
+   * @param prompt User query string
+   * @returns True if sports query, false otherwise.
+   */
+  public isSportsQuery(prompt: string): boolean {
+    if (!prompt || prompt.trim().length === 0) return false;
+    const text = prompt.trim().toLowerCase();
+    const sportsPatterns = [
+      /\b(score|scores|football|soccer|match|matches|fifa|world cup|premier league|champions league|la liga|bundesliga|serie a|europa league|cricket|odi|t20|nba|nfl|ipl|barcelona|real madrid|arsenal|chelsea|manchester|liverpool|bangladesh cricket)\b/i,
+    ];
+    return sportsPatterns.some((p) => p.test(text));
   }
 
   /**
@@ -45,7 +62,7 @@ export class SearchManager {
 
     // 2. Indicators explicitly requiring live search
     const liveSearchPatterns = [
-      /\b(news|weather|price|stock price|score|sports score|match score|who won|latest|current|today|today's|live|recent)\b/i,
+      /\b(news|weather|price|stock price|score|scores|sports score|match score|who won|latest|current|today|today's|live|recent)\b/i,
       /\b(2026|release date|version|recent announcement|breaking news|live update)\b/i,
       /\b(latest ai model|latest model|current price|weather in|temperature in)\b/i,
     ];
@@ -54,7 +71,7 @@ export class SearchManager {
   }
 
   /**
-   * Executes a web search query with result deduplication and caching.
+   * Executes a web or sports search query with result deduplication and caching.
    *
    * @param query Search query string
    * @param limit Maximum results to return (default 3)
@@ -63,6 +80,46 @@ export class SearchManager {
   public async search(query: string, limit = 3): Promise<SearchResponse> {
     const startTime = Date.now();
     const cacheKey = query.trim().toLowerCase();
+
+    // Route sports queries exclusively to SportsSearchProvider
+    if (this.isSportsQuery(query)) {
+      Logger.info('SearchManager', `Routing sports query '${query}' via SportsSearchProvider...`);
+      try {
+        const sportsRes = await this.sportsProvider.search(query, limit);
+        const duration = Date.now() - startTime;
+
+        if (sportsRes.results.length === 0) {
+          // If no match was played, return structured status result so LLM says "No match is being played right now"
+          const emptyStatusResult: SearchResponse = {
+            query,
+            provider: 'sports',
+            results: [
+              {
+                title: 'No live match in progress',
+                url: 'https://www.espn.com',
+                snippet:
+                  'No match or live score is currently available for this team/competition right now.',
+                source: 'ESPN Live Sports',
+              },
+            ],
+            executionTimeMs: duration,
+            cached: false,
+          };
+          this.logSearch(query, 'sports', duration, false, true, 1);
+          return emptyStatusResult;
+        }
+
+        this.logSearch(query, 'sports', duration, false, true, sportsRes.results.length);
+        return {
+          ...sportsRes,
+          executionTimeMs: duration,
+        };
+      } catch (sportsErr: unknown) {
+        const msg = sportsErr instanceof Error ? sportsErr.message : 'Sports fetch error';
+        Logger.warn('SearchManager', `Sports query failed for '${query}'`, msg);
+      }
+    }
+
     const activeProvider = this.getActiveProvider();
 
     // Check cache

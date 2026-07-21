@@ -19,6 +19,19 @@ export interface OwnerCommunicationPreferences {
   avoid: string[];
 }
 
+export interface OwnerLocationDetail {
+  name?: string;
+  address: string;
+  city: string;
+  area: string;
+  country: string;
+}
+
+export interface OwnerLocations {
+  home: OwnerLocationDetail;
+  university: OwnerLocationDetail;
+}
+
 export interface OwnerProfile {
   fullName: string;
   preferredName: string;
@@ -27,6 +40,7 @@ export interface OwnerProfile {
   nationality: string;
   bloodGroup: string;
   currentCountry: string;
+  locations?: OwnerLocations;
   languages: OwnerLanguages;
   education: OwnerEducation;
   career: OwnerCareer;

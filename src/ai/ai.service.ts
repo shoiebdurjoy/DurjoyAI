@@ -9,6 +9,7 @@ import { memoryExtractorService, MemoryExtractorService } from '../memory/memory
 import { toolManager, ToolManager } from '../tools/tool.manager';
 import { searchManager, SearchManager } from '../search/search.manager';
 import { reasoningManager, ReasoningManager } from '../reasoning/reasoning.manager';
+import { locationResolverService } from '../profile/location-resolver.service';
 import { normalizeQuery } from '../utils/query-normalizer';
 import { Logger } from '../utils/logger';
 
@@ -111,12 +112,13 @@ export class AIService {
       let webSearchContext = '';
       if (this.search.shouldSearch(prompt)) {
         Logger.info('AIService', 'Intent classification: Live Web Search Required');
+        const expandedQuery = await locationResolverService.expandSearchQuery(prompt);
         let searchRes;
         try {
-          searchRes = await this.search.search(prompt);
+          searchRes = await this.search.search(expandedQuery);
         } catch (searchErr) {
           Logger.warn('AIService', 'Primary web search failed. Retrying search once...', searchErr);
-          searchRes = await this.search.search(prompt);
+          searchRes = await this.search.search(expandedQuery);
         }
 
         Logger.info('AIService', `Search provider used: "${searchRes.provider}"`);

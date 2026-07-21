@@ -8,6 +8,22 @@ export const DEFAULT_OWNER_PROFILE: OwnerProfile = {
   nationality: 'Bangladeshi',
   bloodGroup: 'AB+',
   currentCountry: 'Bangladesh',
+  locations: {
+    home: {
+      name: 'Home',
+      address: 'Uttara, Dhaka, Bangladesh',
+      area: 'Uttara',
+      city: 'Dhaka',
+      country: 'Bangladesh',
+    },
+    university: {
+      name: 'BRAC University',
+      address: 'BRAC University, Merul Badda, Dhaka, Bangladesh',
+      area: 'Merul Badda',
+      city: 'Dhaka',
+      country: 'Bangladesh',
+    },
+  },
   languages: {
     primary: 'English',
     secondary: ['Bangla (Bengali)'],

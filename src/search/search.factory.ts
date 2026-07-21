@@ -2,6 +2,7 @@ import { ISearchProvider } from './search.interface';
 import { MockSearchProvider } from './providers/mock.provider';
 import { DuckDuckGoSearchProvider } from './providers/duckduckgo.provider';
 import { TavilySearchProvider } from './providers/tavily.provider';
+import { SportsSearchProvider } from './providers/sports.provider';
 
 export class SearchFactory {
   /**
@@ -17,6 +18,10 @@ export class SearchFactory {
 
     if (isProd && providerName === 'mock') {
       throw new Error('MockSearchProvider is strictly forbidden in production environment.');
+    }
+
+    if (providerName === 'sports') {
+      return new SportsSearchProvider();
     }
 
     if (providerName === 'tavily') {
