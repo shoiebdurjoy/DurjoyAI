@@ -186,26 +186,29 @@ const personalMemoryCarriers = [
   "my birthday is", "my age is", "my gender is", "my nationality is",
 
   // Family & Relationships
-  "i have a", "my father", "my mother", "my brother", "my sister",
-  "my wife", "my husband", "my son", "my daughter", "my cousin", "my family",
+  "i have a", "i also have", "i had", "i also had", "my father", "my mother",
+  "my brother", "my sister", "my wife", "my husband", "my son", "my daughter",
+  "my cousin", "my family", "our family", "we have",
 
   // Home & Living
-  "i live in", "i live at", "i moved to", "my address is", "my apartment is",
-  "my house is", "my room is",
+  "i live in", "i live at", "i lived in", "i moved to", "my address is",
+  "my apartment is", "my house is", "my room is",
 
   // Education & School
-  "i study", "i'm studying", "i graduated from", "my university is",
+  "i study", "i'm studying", "i studied", "i graduated from", "my university is",
   "my school is", "my department is", "my major is", "my semester is", "my class is",
 
   // Work & Career
-  "i work at", "i work as", "i got promoted to", "i changed jobs to",
-  "my office is in", "my boss is", "my company is",
+  "i work at", "i work as", "i worked at", "i got promoted to", "i changed jobs to",
+  "my office is in", "my boss is", "my company is", "my job is",
 
   // Devices & Hardware
-  "i bought a new", "i purchased a new", "i got a new", "i own a", "i use a",
-  "my laptop is", "my computer is", "my pc is", "my desktop is", "my monitor is",
-  "my keyboard is", "my mouse is", "my headphones are", "my phone is", "my iphone is",
-  "my android is", "my smartwatch is", "my tablet is",
+  "i bought a new", "i also bought", "i purchased", "i got a new", "i own a", "i use a",
+  "i switched to", "i changed", "i upgraded to", "i downgraded to", "i sold my",
+  "i lost my", "i found my", "my laptop is", "my computer is", "my pc is",
+  "my desktop is", "my monitor is", "my keyboard is", "my mouse is",
+  "my headphones are", "my phone is", "my iphone is", "my android is",
+  "my smartwatch is", "my tablet is", "my tv is",
 
   // Technology & Systems
   "i use windows", "i use linux", "i use macos", "i switched to", "i upgraded to",
@@ -231,13 +234,22 @@ const personalMemoryCarriers = [
   "i visited", "i traveled to", "i'm going to", "my passport expires in", "my visa expires in",
 
   // Goals & Learning
-  "i want to", "my goal is to", "i'm trying to", "i'm learning", "my project is", "my startup is",
+  "i want to", "my goal is to", "i'm trying to", "i'm learning", "my project is", "my startup is", "my hobby is",
 
   // Habits & Routine
   "every morning i", "every night i", "usually i", "always i", "never i",
 
   // Ownership & Purchases
   "i bought", "i sold", "i upgraded", "i replaced", "i lost my", "i found my"
+];
+
+// Natural Conversation Starters (ASK-compliant)
+const conversationStarters = [
+  "i think", "i don't think", "i guess", "i believe", "i feel", "i felt",
+  "i wonder", "i hope", "i wish", "i want", "i wanted", "i would like", "i'd like",
+  "i will", "i'll", "i can", "i can't", "i could", "i couldn't", "i should",
+  "i shouldn't", "i may", "i might", "i mean", "actually", "anyway",
+  "by the way", "guess what", "listen", "wait", "hold on", "never mind"
 ];
 
 // Conversational Suffixes
@@ -283,7 +295,10 @@ const questionCarriers = [
   "i really hate", "i really prefer", "i'm thinking about", "i want to",
   "i need to", "should i", "is it safe to", "is it good to", "is it healthy to",
   "how hard is it to", "how easy is it to", "how fast is", "how long is",
-  "how far is", "how old is", "what time does", "what date is", "what day is"
+  "how far is", "how old is", "what time does", "what date is", "what day is",
+  "is there", "are there", "was there", "were there", "has there been", "have there been",
+  "do i have", "did i", "can i", "could i", "would i", "should i", "when did i",
+  "where did i", "what did i", "which", "summarize"
 ];
 
 // Single Global Set to guarantee 100% zero duplicates across all intents
@@ -321,7 +336,7 @@ questionCarriers.forEach(q => {
   }
 });
 
-// 3. Add Personal Memory Carriers to ConversationalIntent
+// 3. Add Personal Memory Carriers & Starters to ConversationalIntent
 personalMemoryCarriers.forEach(pm => {
   const norm = `${pm} {prompt}`;
   if (!globalSet.has(norm)) {
@@ -333,6 +348,14 @@ personalMemoryCarriers.forEach(pm => {
   if (!globalSet.has(normDurjoy)) {
     convSet.add(normDurjoy);
     globalSet.add(normDurjoy);
+  }
+});
+
+conversationStarters.forEach(cs => {
+  const norm = `${cs} {prompt}`;
+  if (!globalSet.has(norm)) {
+    convSet.add(norm);
+    globalSet.add(norm);
   }
 });
 
@@ -358,7 +381,9 @@ const casualStarts = [
   "thanks", "thank you", "okay", "yes", "no", "maybe", "sure", "cool",
   "awesome", "great", "bye", "see you", "it's", "its", "actually",
   "damn", "fuck", "shit", "angry", "sad", "happy", "tired", "stressed",
-  "i am", "i'm", "i feel", "i have", "i want", "i need", "can i", "could i"
+  "i am", "i'm", "i feel", "i have", "i want", "i need", "can i", "could i",
+  "not really", "exactly", "continue", "go on", "tell me more", "what about",
+  "and", "then", "alright", "fine", "sounds good"
 ];
 
 casualStarts.forEach(c => {
@@ -411,7 +436,6 @@ console.log(`ChatIntent: ${chatList.length} utterances.`);
 console.log(`ConversationalIntent: ${convList.length} utterances.`);
 console.log(`GeneralQueryIntent: ${genList.length} utterances.`);
 console.log(`Global Unique Utterances: ${globalSet.size}`);
-console.log(`Personal Memory Carriers added: ${personalMemoryCarriers.length * 2}`);
 
 const resultJson = {
   interactionModel: {
