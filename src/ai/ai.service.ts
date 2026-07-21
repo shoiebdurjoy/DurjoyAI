@@ -190,10 +190,19 @@ export class AIService {
 
       // Process any embedded memory action tags in LLM response
       const cleanSpeech = await this.extractor.processMemoryActionTags(responseText);
-      const finalResponseText =
+      let finalResponseText =
         cleanSpeech && cleanSpeech.trim().length > 0
           ? cleanSpeech.trim()
           : "I'm right here. How can I help you next?";
+
+      // Sanitize against rare provider completion glitches (e.g. repeated numeric series)
+      if (/\d+\.\s*\d+\.\s*\d+\./.test(finalResponseText) || finalResponseText.length > 800) {
+        Logger.warn(
+          'AIService',
+          `Corrupted speech output detected from LLM provider -> Falling back to clean voice response. Raw: "${finalResponseText.substring(0, 80)}..."`,
+        );
+        finalResponseText = "Got it. I'll remember that. What else is on your mind?";
+      }
 
       Logger.info('AIService', `AI response received: "${finalResponseText}"`);
 
