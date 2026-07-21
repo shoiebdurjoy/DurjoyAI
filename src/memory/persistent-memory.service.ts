@@ -238,10 +238,12 @@ export class PersistentMemoryService {
     const text = prompt.toLowerCase();
 
     const ignorePatterns = [
-      /\b(hello|hi|hey|good morning|good evening|goodnight)\b/,
-      /\b(weather|temperature|rain|forecast)\b/,
-      /\b(joke|funny|laugh)\b/,
-      /\b(what time|date today|lunch|dinner|breakfast)\b/,
+      /\b(hello|hi|hey|good morning|good evening|goodnight|good night|thanks|thank you|okay|ok|yes|no|cool|lol|haha|bye|good)\b/i,
+      /\b(maybe|probably|i think|perhaps|i might|i guess|could be|unsure)\b/i,
+      /\b(weather|temperature|rain|forecast)\b/i,
+      /\b(joke|funny|laugh)\b/i,
+      /\b(what time|date today|lunch|dinner|breakfast)\b/i,
+      /\b(fuck|shit|damn|crap)\b/i,
     ];
 
     if (ignorePatterns.some((pattern) => pattern.test(text))) {

@@ -1,0 +1,91 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, before, after } from 'node:test';
+import assert from 'node:assert';
+import { aiService } from './ai.service';
+import { persistentMemoryService } from '../memory/persistent-memory.service';
+
+describe('Milestone 14.6 — Conversation Reliability & Smart Memory End-to-End Test Suite', () => {
+  before(() => {
+    process.env.NODE_ENV = 'test';
+    process.env.AI_PROVIDER = 'mock';
+    process.env.SEARCH_PROVIDER = 'mock';
+  });
+
+  after(() => {
+    process.env.NODE_ENV = 'production';
+    process.env.AI_PROVIDER = 'openrouter';
+    process.env.SEARCH_PROVIDER = 'duckduckgo';
+  });
+
+  it('should test all 13 required prompts end-to-end without crashes or blank responses', async () => {
+    const testPrompts = [
+      'Hello',
+      'How are you',
+      'Fuck you',
+      'I have an exam tomorrow',
+      'My favorite color is blue',
+      "Actually it's green",
+      "What's my favorite color",
+      'Will it rain today',
+      'Traffic to university',
+      "What's the latest FIFA score",
+      "What's the weather in London",
+      'Time now',
+      "Today's news",
+    ];
+
+    for (const prompt of testPrompts) {
+      const res = await aiService.generateResponse(prompt, {
+        userId: 'm14-6-test-user',
+        sessionId: 'm14-6-test-session',
+      });
+
+      assert.ok(res, `Response for '${prompt}' must be non-null`);
+      assert.ok(res.trim().length > 0, `Response for '${prompt}' must be non-empty`);
+      assert.ok(
+        !res.includes('[MEMORY_ACTION:'),
+        `Response for '${prompt}' must not contain unstripped memory tags`,
+      );
+    }
+  });
+
+  it('should NOT save uncertain statements into memory', () => {
+    const uncertainPrompts = [
+      'Maybe my favorite color is yellow',
+      'I think I might live in Uttara',
+      'Perhaps I study computer science',
+      'I guess my GPU is RTX 3060',
+    ];
+
+    for (const p of uncertainPrompts) {
+      const result = persistentMemoryService.shouldRemember(p);
+      assert.strictEqual(
+        result,
+        false,
+        `Uncertain statement '${p}' must NOT be marked for long-term memory`,
+      );
+    }
+  });
+
+  it('should NOT save casual greetings or profanity into memory', () => {
+    const casualPrompts = [
+      'hello',
+      'hi',
+      'thanks',
+      'okay',
+      'yes',
+      'no',
+      'cool',
+      'lol',
+      'haha',
+      'bye',
+      'good morning',
+      'fuck you',
+    ];
+
+    for (const p of casualPrompts) {
+      const result = persistentMemoryService.shouldRemember(p);
+      assert.strictEqual(result, false, `Casual prompt '${p}' must NOT be marked for memory`);
+    }
+  });
+});

@@ -27,25 +27,32 @@ export class MemoryExtractorService {
       return aiResponse;
     }
 
-    const tagRegex = /\[MEMORY_ACTION:\s*([^|]+)\|([^|]+)\|([^\]]+)\]/gi;
-    let cleanText = aiResponse;
-    let match;
+    try {
+      const tagRegex = /\[MEMORY_ACTION:\s*([^|]+)\|([^|]+)\|([^\]]+)\]/gi;
+      let cleanText = aiResponse;
+      let match;
 
-    while ((match = tagRegex.exec(aiResponse)) !== null) {
-      const category = match[1].trim();
-      const key = match[2].trim();
-      const value = match[3].trim();
+      while ((match = tagRegex.exec(aiResponse)) !== null) {
+        const category = match[1].trim();
+        const key = match[2].trim();
+        const value = match[3].trim();
 
-      Logger.info(
-        'MemoryExtractorService',
-        `Upserting memory record from LLM tag | Category: "${category}" | Key: "${key}" | Value: "${value}"`,
-      );
+        Logger.info(
+          'MemoryExtractorService',
+          `Upserting memory record from LLM tag | Category: "${category}" | Key: "${key}" | Value: "${value}"`,
+        );
 
-      await this.memoryService.saveMemory(category, key, value, 8);
+        await this.memoryService.saveMemory(category, key, value, 8).catch((err) => {
+          Logger.warn('MemoryExtractorService', 'Failed saving memory action tag', err);
+        });
+      }
+
+      cleanText = cleanText.replace(tagRegex, '').trim();
+      return cleanText;
+    } catch (err: unknown) {
+      Logger.warn('MemoryExtractorService', 'Error in processMemoryActionTags', err);
+      return aiResponse.replace(/\[MEMORY_ACTION:[^\]]+\]/gi, '').trim();
     }
-
-    cleanText = cleanText.replace(tagRegex, '').trim();
-    return cleanText;
   }
 
   /**
@@ -56,30 +63,35 @@ export class MemoryExtractorService {
    * @returns Resolved MemoryRecord if a fact was learned/updated, or null if ignored.
    */
   public async analyzeAndSave(prompt: string): Promise<MemoryRecord | null> {
-    const extracted = this.extractFact(prompt);
-    if (
-      !extracted ||
-      !extracted.shouldRemember ||
-      !extracted.category ||
-      !extracted.key ||
-      !extracted.value
-    ) {
+    try {
+      const extracted = this.extractFact(prompt);
+      if (
+        !extracted ||
+        !extracted.shouldRemember ||
+        !extracted.category ||
+        !extracted.key ||
+        !extracted.value
+      ) {
+        return null;
+      }
+
+      Logger.info(
+        'MemoryExtractorService',
+        `Auto-extracted fact | Category: "${extracted.category}" | Key: "${extracted.key}" | Value: "${extracted.value}"`,
+      );
+
+      return await this.memoryService.saveMemory(
+        extracted.category,
+        extracted.key,
+        extracted.value,
+        extracted.importance ?? 5,
+        extracted.parentId,
+        extracted.relatedIds,
+      );
+    } catch (err: unknown) {
+      Logger.warn('MemoryExtractorService', 'Failed auto-extracting fact from prompt', err);
       return null;
     }
-
-    Logger.info(
-      'MemoryExtractorService',
-      `Auto-extracted fact | Category: "${extracted.category}" | Key: "${extracted.key}" | Value: "${extracted.value}"`,
-    );
-
-    return this.memoryService.saveMemory(
-      extracted.category,
-      extracted.key,
-      extracted.value,
-      extracted.importance ?? 5,
-      extracted.parentId,
-      extracted.relatedIds,
-    );
   }
 
   /**
@@ -96,7 +108,7 @@ export class MemoryExtractorService {
 
     const text = prompt.trim();
 
-    // Ignore greetings, weather, small talk, jokes, lunch, thanks, insults
+    // Ignore greetings, weather, small talk, jokes, lunch, thanks, insults, uncertainty
     if (!this.memoryService.shouldRemember(text)) {
       return { shouldRemember: false };
     }
