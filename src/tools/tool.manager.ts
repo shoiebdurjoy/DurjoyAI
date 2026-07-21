@@ -25,7 +25,7 @@ export class ToolManager {
 
     // 1. Time / Date queries
     if (
-      /\b(what time|current time|date today|what date|what day is it|clock|time is it)\b/i.test(
+      /\b(what time|what's the time|current time|time now|date today|what date|what day is it|clock|time is it|^time$)\b/i.test(
         text,
       )
     ) {
