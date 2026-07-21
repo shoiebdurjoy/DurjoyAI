@@ -106,7 +106,7 @@ export class MemoryExtractorService {
       return { shouldRemember: false };
     }
 
-    const text = prompt.trim();
+    const text = prompt.trim().replace(/[.!?]+$/, '');
 
     // 0. Short color update (e.g. "its blue", "it's blue", "it's green", "actually it's red", "blue")
     const colorMatch = text.match(
@@ -119,6 +119,23 @@ export class MemoryExtractorService {
         category: 'Preference',
         key: 'Favorite Color',
         value: colorVal,
+        importance: 8,
+      };
+    }
+
+    // 0b. General Purchase / Device Acquisition (e.g. "I bought Alexa version four on seventeenth July")
+    const purchaseMatch = text.match(/i (bought|purchased|got|acquired) (.+?)( (on|in) (.+))?$/i);
+    if (purchaseMatch) {
+      const item = purchaseMatch[2].replace(/[.!]$/, '').trim();
+      const dateStr = purchaseMatch[5] ? purchaseMatch[5].replace(/[.!]$/, '').trim() : '';
+      const fullVal = dateStr ? `${item} on ${dateStr}` : item;
+      const keyName = item.toLowerCase().includes('alexa') ? 'Alexa Purchase' : `${item} Purchase`;
+
+      return {
+        shouldRemember: true,
+        category: 'Purchase',
+        key: keyName,
+        value: fullVal,
         importance: 8,
       };
     }

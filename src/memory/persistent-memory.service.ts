@@ -133,6 +133,9 @@ export class PersistentMemoryService {
       work: ['career', 'occupation', 'job'],
       laptop: ['device', 'hardware', 'gpu', 'ram'],
       club: ['sports', 'football', 'preference'],
+      buy: ['bought', 'purchased', 'purchase', 'acquisition', 'got'],
+      bought: ['buy', 'purchased', 'purchase', 'acquisition', 'got'],
+      alexa: ['device', 'assistant', 'echo', 'speaker'],
     };
 
     const rawWords = prompt
@@ -251,18 +254,22 @@ export class PersistentMemoryService {
     }
 
     const rememberPatterns = [
-      /\bmy name is\b/,
-      /\bi study\b/,
-      /\bi work\b/,
-      /\bmy favorite\b/,
-      /\bi love\b/,
-      /\bmy laptop\b/,
-      /\bmy desktop\b/,
-      /\bmy gpu\b/,
-      /\bmy goal\b/,
-      /\bmy birthday\b/,
-      /\bi live in\b/,
-      /\bmy degree\b/,
+      /\bmy name is\b/i,
+      /\bi study\b/i,
+      /\bi work\b/i,
+      /\bmy favorite\b/i,
+      /\bi love\b/i,
+      /\bmy laptop\b/i,
+      /\bmy desktop\b/i,
+      /\bmy gpu\b/i,
+      /\bmy goal\b/i,
+      /\bmy birthday\b/i,
+      /\bi live in\b/i,
+      /\bmy degree\b/i,
+      /\bi (bought|purchased|got|acquired)\b/i,
+      /\bmy alexa\b/i,
+      /\balexa version\b/i,
+      /\bit'?s (actually )?(blue|green|red|yellow|black|white|purple|pink|orange|brown)\b/i,
     ];
 
     return rememberPatterns.some((pattern) => pattern.test(text));

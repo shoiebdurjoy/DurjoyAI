@@ -130,7 +130,13 @@ export class AIService {
       }
 
       // 6. Automatic Memory Extraction
-      await this.extractor.analyzeAndSave(prompt);
+      const savedFact = await this.extractor.analyzeAndSave(prompt);
+      if (savedFact) {
+        Logger.info(
+          'AIService',
+          `Automatic Memory Saved to SQLite: Category "${savedFact.category}" | Key "${savedFact.key}" | Value "${savedFact.value}"`,
+        );
+      }
 
       // 7. Retrieve short-term dialogue history
       const conversationContext = await this.session.getRecentHistorySummary(userId, sessionId);
@@ -140,6 +146,9 @@ export class AIService {
 
       // 9. Retrieve relevant long-term memories
       const relevantMemories = await this.memory.getRelevantMemories(prompt);
+      if (savedFact && !relevantMemories.some((m) => m.key === savedFact.key)) {
+        relevantMemories.push(savedFact);
+      }
       Logger.info(
         'AIService',
         `Memory lookup: ${relevantMemories.length} relevant memories retrieved`,
