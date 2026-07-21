@@ -19,9 +19,10 @@ export async function alexaVerificationMiddleware(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  const skipHeader = req.headers['x-skip-verification'];
   const skipVerification =
-    process.env.SKIP_ALEXA_VERIFICATION === 'true' ||
-    req.headers['x-skip-verification'] === 'durjoy-dev-pass';
+    process.env.SKIP_ALEXA_VERIFICATION === 'true' || skipHeader === 'durjoy-dev-pass';
+
   if (skipVerification) {
     Logger.info('AlexaVerifier', 'Request verification skipped for dev test.');
     return next();

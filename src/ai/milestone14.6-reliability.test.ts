@@ -6,7 +6,7 @@ import { persistentMemoryService } from '../memory/persistent-memory.service';
 import { memoryExtractorService } from '../memory/memory-extractor.service';
 import { locationResolverService } from '../profile/location-resolver.service';
 
-describe('Milestone 14.6 — Conversation Reliability & Smart Memory End-to-End Test Suite', () => {
+describe('Milestone Universal Alexa NLP Routing & Reliability Test Suite', () => {
   before(() => {
     process.env.NODE_ENV = 'test';
     process.env.AI_PROVIDER = 'mock';
@@ -19,27 +19,33 @@ describe('Milestone 14.6 — Conversation Reliability & Smart Memory End-to-End 
     process.env.SEARCH_PROVIDER = 'duckduckgo';
   });
 
-  it('should test all 13 required prompts end-to-end without crashes or blank responses', async () => {
+  it('should test all 19 natural conversational prompts end-to-end without crashes or blank responses', async () => {
     const testPrompts = [
       'Hello',
+      'Hi',
       'How are you',
+      'Good morning',
       'Fuck you',
-      'I have an exam tomorrow',
-      'My favorite color is blue',
-      "Actually it's green",
-      "What's my favorite color",
-      'Will it rain today',
+      "It's blue",
+      'Actually green',
+      'Tomorrow',
+      'Yes',
+      'No',
+      'Maybe',
+      'I have an exam',
+      'Tell me a joke',
+      'Who won yesterday',
+      'Will it rain?',
       'Traffic to university',
-      "What's the latest FIFA score",
-      "What's the weather in London",
-      'Time now',
-      "Today's news",
+      'Remind me to study',
+      'My laptop is broken',
+      "I'm tired",
     ];
 
     for (const prompt of testPrompts) {
       const res = await aiService.generateResponse(prompt, {
-        userId: 'm14-6-test-user',
-        sessionId: 'm14-6-test-session',
+        userId: 'm-nlp-test-user',
+        sessionId: 'm-nlp-test-session',
       });
 
       assert.ok(res, `Response for '${prompt}' must be non-null`);
@@ -62,8 +68,8 @@ describe('Milestone 14.6 — Conversation Reliability & Smart Memory End-to-End 
     assert.strictEqual(mem2?.value, 'green');
   });
 
-  it('should expand weather queries like "what\'s the weather today" to Uttara Dhaka Bangladesh', async () => {
-    const expanded = await locationResolverService.expandSearchQuery("what's the weather today");
+  it('should expand weather queries like "will it rain" to Uttara Dhaka Bangladesh', async () => {
+    const expanded = await locationResolverService.expandSearchQuery('Will it rain?');
     assert.ok(expanded.includes('Uttara'), 'Expanded weather query must include Uttara');
     assert.ok(expanded.includes('Dhaka'), 'Expanded weather query must include Dhaka');
   });
