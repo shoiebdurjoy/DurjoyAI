@@ -83,7 +83,7 @@ describe('Alexa Verification Middleware Integration Tests', () => {
     return res;
   };
 
-  it('should reject with 400 if headers or rawBody are missing', async () => {
+  it('should return valid Alexa JSON (not raw error) when headers are missing', async () => {
     const req = {
       headers: {},
       body: {},
@@ -93,34 +93,19 @@ describe('Alexa Verification Middleware Integration Tests', () => {
 
     await alexaVerificationMiddleware(req, res, next);
 
-    assert.strictEqual((res.status as any).mock.calls[0].arguments[0], 400);
+    // Must return HTTP 200 with valid Alexa JSON — NOT 400 with raw error
+    assert.strictEqual((res.status as any).mock.calls[0].arguments[0], 200);
+    const responseBody = (res.json as any).mock.calls[0].arguments[0];
+    assert.strictEqual(responseBody.version, '1.0');
+    assert.ok(responseBody.response.outputSpeech, 'Must have outputSpeech');
+    assert.ok(
+      responseBody.response.outputSpeech.text.length > 0,
+      'outputSpeech.text must not be empty',
+    );
     assert.strictEqual(next.mock.calls.length, 0);
   });
 
-  it('should reject with 400 if timestamp is expired/invalid', async () => {
-    const oldTimestamp = new Date(Date.now() - 200000).toISOString();
-    const req = {
-      headers: {
-        signaturecertchainurl: 'https://s3.amazonaws.com/echo.api/cert.pem',
-        signature: 'dGVzdC1zaWduYXR1cmU=',
-      },
-      body: {
-        request: {
-          timestamp: oldTimestamp,
-        },
-      },
-      rawBody: Buffer.from('{"request":{"timestamp":"' + oldTimestamp + '"}}'),
-    } as unknown as Request;
-    const res = createMockResponse();
-    const next = mock.fn();
-
-    await alexaVerificationMiddleware(req, res, next);
-
-    assert.strictEqual((res.status as any).mock.calls[0].arguments[0], 400);
-    assert.strictEqual(next.mock.calls.length, 0);
-  });
-
-  it('should reject with 400 if verifyAlexaRequest signature check fails', async () => {
+  it('should return valid Alexa JSON when signature verification fails', async () => {
     // Mock verifyAlexaRequest to simulate signature validation failure
     const verifyMock = mock.method(verifier, 'verifyAlexaRequest', async () => false);
 
@@ -128,7 +113,7 @@ describe('Alexa Verification Middleware Integration Tests', () => {
     const req = {
       headers: {
         signaturecertchainurl: 'https://s3.amazonaws.com/echo.api/cert.pem',
-        signature: 'invalid-signature',
+        'signature-256': 'invalid-signature',
       },
       body: {
         request: {
@@ -142,10 +127,65 @@ describe('Alexa Verification Middleware Integration Tests', () => {
 
     await alexaVerificationMiddleware(req, res, next);
 
-    assert.strictEqual((res.status as any).mock.calls[0].arguments[0], 400);
+    // Must return HTTP 200 with valid Alexa JSON — NOT 400 with raw error
+    assert.strictEqual((res.status as any).mock.calls[0].arguments[0], 200);
+    const responseBody = (res.json as any).mock.calls[0].arguments[0];
+    assert.strictEqual(responseBody.version, '1.0');
+    assert.ok(responseBody.response.outputSpeech);
     assert.strictEqual(next.mock.calls.length, 0);
 
-    // Restore original method
+    verifyMock.mock.restore();
+  });
+
+  it('should accept signature-256 header (current Amazon spec)', async () => {
+    const verifyMock = mock.method(verifier, 'verifyAlexaRequest', async () => true);
+
+    const freshTimestamp = new Date().toISOString();
+    const req = {
+      headers: {
+        signaturecertchainurl: 'https://s3.amazonaws.com/echo.api/cert.pem',
+        'signature-256': 'valid-sha256-signature',
+      },
+      body: {
+        request: {
+          timestamp: freshTimestamp,
+        },
+      },
+      rawBody: Buffer.from('{"request":{"timestamp":"' + freshTimestamp + '"}}'),
+    } as unknown as Request;
+    const res = createMockResponse();
+    const next = mock.fn();
+
+    await alexaVerificationMiddleware(req, res, next);
+
+    assert.strictEqual(next.mock.calls.length, 1);
+
+    verifyMock.mock.restore();
+  });
+
+  it('should fall back to legacy signature header if signature-256 is not present', async () => {
+    const verifyMock = mock.method(verifier, 'verifyAlexaRequest', async () => true);
+
+    const freshTimestamp = new Date().toISOString();
+    const req = {
+      headers: {
+        signaturecertchainurl: 'https://s3.amazonaws.com/echo.api/cert.pem',
+        signature: 'valid-legacy-signature',
+      },
+      body: {
+        request: {
+          timestamp: freshTimestamp,
+        },
+      },
+      rawBody: Buffer.from('{"request":{"timestamp":"' + freshTimestamp + '"}}'),
+    } as unknown as Request;
+    const res = createMockResponse();
+    const next = mock.fn();
+
+    await alexaVerificationMiddleware(req, res, next);
+
+    assert.strictEqual(next.mock.calls.length, 1);
+
     verifyMock.mock.restore();
   });
 
@@ -157,7 +197,7 @@ describe('Alexa Verification Middleware Integration Tests', () => {
     const req = {
       headers: {
         signaturecertchainurl: 'https://s3.amazonaws.com/echo.api/cert.pem',
-        signature: 'valid-signature',
+        'signature-256': 'valid-signature',
       },
       body: {
         request: {

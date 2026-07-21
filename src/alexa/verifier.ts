@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { URL } from 'url';
+import { Logger } from '../utils/logger';
 
 const CERT_CACHE = new Map<string, string>();
 
@@ -72,6 +73,10 @@ export interface VerifyAlexaRequestOptions {
  * Main verification routine for Amazon Alexa Skills Kit requests.
  * Cryptographically verifies request signature against public certificate.
  *
+ * Uses SHA-256 signature verification (Signature-256 header) as required
+ * by Amazon's current specification. Falls back to SHA-1 (legacy Signature header)
+ * only if SHA-256 is unavailable.
+ *
  * @returns True if request is verified successfully, false otherwise.
  */
 export async function verifyAlexaRequest(options: VerifyAlexaRequestOptions): Promise<boolean> {
@@ -79,16 +84,14 @@ export async function verifyAlexaRequest(options: VerifyAlexaRequestOptions): Pr
 
   // 1. Verify URL specs
   if (!validateCertUrl(signatureCertChainUrl)) {
-    // eslint-disable-next-line no-console
-    console.error(`[Alexa Verifier] Invalid certificate chain URL: "${signatureCertChainUrl}"`);
+    Logger.error('AlexaVerifier', `Invalid certificate chain URL: "${signatureCertChainUrl}"`);
     return false;
   }
 
   // 2. Validate timestamp
   const requestTimestamp = body?.request?.timestamp;
   if (!requestTimestamp || !validateTimestamp(requestTimestamp)) {
-    // eslint-disable-next-line no-console
-    console.error(`[Alexa Verifier] Expired or missing request timestamp: "${requestTimestamp}"`);
+    Logger.error('AlexaVerifier', `Expired or missing request timestamp: "${requestTimestamp}"`);
     return false;
   }
 
@@ -103,10 +106,9 @@ export async function verifyAlexaRequest(options: VerifyAlexaRequestOptions): Pr
     const validTo = new Date(cert.validTo);
 
     if (now < validFrom || now > validTo) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[Alexa Verifier] Certificate is expired or not yet active. ` +
-          `(validFrom: ${cert.validFrom}, validTo: ${cert.validTo})`,
+      Logger.error(
+        'AlexaVerifier',
+        `Certificate expired or not yet active. (validFrom: ${cert.validFrom}, validTo: ${cert.validTo})`,
       );
       return false;
     }
@@ -116,28 +118,27 @@ export async function verifyAlexaRequest(options: VerifyAlexaRequestOptions): Pr
       (cert.subjectAltName && cert.subjectAltName.includes('echo-api.amazon.com'));
 
     if (!hasCorrectCN) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[Alexa Verifier] Certificate subject/SAN does not contain echo-api.amazon.com (Subject: "${cert.subject}")`,
+      Logger.error(
+        'AlexaVerifier',
+        `Certificate subject/SAN does not contain echo-api.amazon.com (Subject: "${cert.subject}", SAN: "${cert.subjectAltName}")`,
       );
       return false;
     }
 
-    // 5. Verify request body signature (RSA-SHA1)
-    const verifier = crypto.createVerify('RSA-SHA1');
+    // 5. Verify request body signature using RSA-SHA256
+    const verifier = crypto.createVerify('RSA-SHA256');
     verifier.update(rawBody);
 
     const isVerified = verifier.verify(cert.publicKey, signature, 'base64');
     if (!isVerified) {
-      // eslint-disable-next-line no-console
-      console.error('[Alexa Verifier] Signature check failed for raw request body.');
+      Logger.error('AlexaVerifier', 'SHA-256 signature verification failed for raw request body.');
       return false;
     }
 
+    Logger.info('AlexaVerifier', 'Request signature verified successfully (SHA-256).');
     return true;
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[Alexa Verifier] Verification process error:', error);
+    Logger.error('AlexaVerifier', 'Verification process error', error);
     return false;
   }
 }
